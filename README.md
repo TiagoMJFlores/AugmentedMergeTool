@@ -1,11 +1,8 @@
-::: {align="center"}
-# 🔀 AugmentedMergeTool
+# AugmentedMergeTool
 
 ### AI-powered merge conflict resolver with **full ticket context**
 
-`<br/>`{=html}
 
-`<br/>`{=html}
 
 🚀 **Resolve merge conflicts with intent, not guesswork**
 :::
@@ -14,7 +11,7 @@
 
 ## ⚡ Why this exists
 
-Merge conflicts aren't just annoying --- they're **ambiguous**.
+Merge conflicts aren't just annoying --- they're ambiguous.
 
 By the time you're resolving them, you've lost:
 - ❌ the context\
@@ -77,8 +74,8 @@ npx mergeagent
 
 ## 🛠 Requirements
 
--   Node.js ≥ 18\
--   Git\
+-   Node.js ≥ 18
+-   Git
 -   Anthropic API key
 
 ------------------------------------------------------------------------
@@ -126,16 +123,18 @@ npx mergeagent --provider=none
   Provider           Status
   ------------------ --------
   🔵 Linear          ✅
+  
   🟠 Jira            ✅
+  
   ⚫ GitHub Issues   ✅
-  ➖ None            ✅
+  
 
 ------------------------------------------------------------------------
 
 ## 🗺 Roadmap
 
--   [ ] VS Code extension\ ?
--   [ ] More providers\ ?
+-   [ ] VS Code extension
+-   [ ] More providers
 
 
 ------------------------------------------------------------------------
