@@ -2,6 +2,7 @@ import 'dotenv/config';
 import simpleGit from 'simple-git';
 import * as fs from 'fs';
 import { buildConflictBlocks } from './core/buildConflictBlocks.js';
+import { createProvider, normalizeProvider } from './core/providers/index.js';
 import { resolveConflict } from './core/resolveConflict.js';
 import {
   printHeader,
@@ -18,7 +19,22 @@ import type { ConflictSummaryEntry } from './core/types.js';
 
 const git = simpleGit();
 
+function getProviderArg(argv: string[]): string | undefined {
+  const direct = argv.find((arg) => arg.startsWith('--provider='));
+  if (direct) return direct.split('=')[1];
+
+  const index = argv.indexOf('--provider');
+  if (index >= 0) return argv[index + 1];
+
+  return undefined;
+}
+
+
 async function run(): Promise<void> {
+  const providerFromArg = getProviderArg(process.argv.slice(2));
+  const providerName = normalizeProvider(providerFromArg ?? process.env.TICKET_PROVIDER);
+  const ticketProvider = createProvider({ provider: providerName });
+
   const status = await git.status();
   const conflictingFiles = status.conflicted;
 
@@ -41,7 +57,7 @@ async function run(): Promise<void> {
 
   for (const relPath of conflictingFiles) {
     const absPath = `${process.cwd()}/${relPath}`;
-    const blocks = await buildConflictBlocks(absPath);
+    const blocks = await buildConflictBlocks(absPath, ticketProvider);
 
     const decisions: {
       range: { start: number; end: number };
