@@ -14,8 +14,8 @@
 Merge conflicts aren't just annoying --- they're ambiguous.
 
 By the time you're resolving them, you've lost:
-- ❌ the context\
-- ❌ the intent\
+- ❌ the context
+- ❌ the intent
 - ❌ the reason behind each change
 
 ------------------------------------------------------------------------
@@ -25,16 +25,16 @@ By the time you're resolving them, you've lost:
 Most tools try to automatically fix conflicts.
 
 This tool augments the developer instead: 
-- brings ticket context\
-- explains intent\
-- suggests resolutions\
+- brings ticket context
+- explains intent
+- suggests resolutions
 - keeps you in control
 
 ------------------------------------------------------------------------
 
 ## Human ↔ AI collaboration
 
-> The developer defines intent.\
+> The developer defines intent.
 > The AI handles complexity.
 
 ------------------------------------------------------------------------
