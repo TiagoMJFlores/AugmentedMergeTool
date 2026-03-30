@@ -39,6 +39,19 @@ This tool augments the developer instead:
 
 ------------------------------------------------------------------------
 
+## 🔎 How it works
+
+For each conflict block, AugmentedMergeTool:
+
+1. detects the conflicting lines
+2. reads the git history for those exact lines
+3. identifies the commits that introduced each side of the conflict
+4. extracts the ticket/card ID from the commit message
+5. fetches the ticket context from your configured provider
+6. asks AI to explain the intent and suggest a resolution
+
+This means the tool is not guessing from current code alone — it uses the line-level Git history plus the referenced ticket/card to understand **why** each side changed.
+
 ## Demo
 
     $ npx mergeagent
@@ -60,7 +73,6 @@ This tool augments the developer instead:
     }
 
     [U] Use suggestion   [S] Skip
-    >
 
 ------------------------------------------------------------------------
 
@@ -77,6 +89,27 @@ npx mergeagent
 -   Node.js ≥ 18
 -   Git
 -   Anthropic API key
+
+
+### Optional (recommended)
+
+- API key for your ticket provider (Linear, Jira, or GitHub)
+- include ticket ID in commits (Optional)
+
+To get full context, your commits must include the ticket/card ID. The tool extracts the ticket ID directly from commit messages.
+
+Example:
+
+```bash
+git commit -m "#21: add caching layer"
+git commit -m "#23: migrate service to async/await"
+```
+------------------------------------------------------------------------
+
+## Works with existing projects
+No need to rewrite your Git history.
+From now on, just add the ticket ID to your commits.
+The tool will use ticket context where it exists, and fall back to code + git history for older commits.
 
 ------------------------------------------------------------------------
 
@@ -115,6 +148,7 @@ npx mergeagent --provider=jira
 npx mergeagent --provider=github
 npx mergeagent --provider=none
 ```
+
 
 ------------------------------------------------------------------------
 
