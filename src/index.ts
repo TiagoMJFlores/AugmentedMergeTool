@@ -74,9 +74,9 @@ async function run(): Promise<void> {
       const theirsTicket = block.theirs.ticket;
 
       if (oursTicket)
-        console.log(`  LEFT  (HEAD)   · ${oursTicket.ticketId}`);
+        console.log(`  LEFT  (HEAD)   · ${oursTicket.ticketId}: ${oursTicket.intentSummary}`);
       if (theirsTicket)
-        console.log(`  RIGHT (theirs) · ${theirsTicket.ticketId}`);
+        console.log(`  RIGHT (theirs) · ${theirsTicket.ticketId}: ${theirsTicket.intentSummary}`);
 
       console.log(`\n  ── Left ${'─'.repeat(32)}`);
       console.log(block.ours.content);
@@ -95,13 +95,20 @@ async function run(): Promise<void> {
         answer = await prompt('\n  [U] Use suggestion   [S] Skip\n> ');
       }
 
+      const ticketPrefix = [oursTicket?.ticketId, theirsTicket?.ticketId]
+        .filter(Boolean)
+        .join(' / ');
+      const summaryLabel = ticketPrefix
+        ? `${ticketPrefix} · ${label}`
+        : label;
+
       if (answer === 'u') {
-        decisions.push({ range: block.range, resolution, action: 'Applied', label });
-        summary.push({ label, action: 'Applied' });
+        decisions.push({ range: block.range, resolution, action: 'Applied', label: summaryLabel });
+        summary.push({ label: summaryLabel, action: 'Applied' });
         console.log('  ✅ Applied.\n');
       } else {
-        decisions.push({ range: block.range, resolution: '', action: 'Skipped', label });
-        summary.push({ label, action: 'Skipped' });
+        decisions.push({ range: block.range, resolution: '', action: 'Skipped', label: summaryLabel });
+        summary.push({ label: summaryLabel, action: 'Skipped' });
         console.log('  ⏭️  Skipped.\n');
       }
     }
