@@ -33,27 +33,31 @@ async function run(): Promise<void> {
   console.log(`${'═'.repeat(40)}\n`);
 
   let totalConflicts = 0;
-  const fileBlocks: { relPath: string; blockCount: number }[] = [];
 
   for (const relPath of conflictingFiles) {
     const absPath = `${process.cwd()}/${relPath}`;
     const content = fs.readFileSync(absPath, 'utf-8');
     const markerCount = (content.match(/^<{7} /gm) || []).length;
     totalConflicts += markerCount;
-    fileBlocks.push({ relPath, blockCount: markerCount });
   }
 
   console.log(
     `Found ${totalConflicts} conflict(s) in ${conflictingFiles.length} file(s).\n`
   );
 
+  interface Decision {
+    range: { start: number; end: number };
+    resolution: string;
+    action: 'Applied' | 'Skipped';
+    label: string;
+  }
+
   const summary: { label: string; action: 'Applied' | 'Skipped' }[] = [];
 
   for (const relPath of conflictingFiles) {
     const absPath = `${process.cwd()}/${relPath}`;
     const blocks = await buildConflictBlocks(absPath);
-    let fileContent = fs.readFileSync(absPath, 'utf-8');
-    let fileModified = false;
+    const decisions: Decision[] = [];
 
     for (let i = 0; i < blocks.length; i++) {
       const block = blocks[i];
@@ -92,19 +96,32 @@ async function run(): Promise<void> {
       }
 
       if (answer === 'u') {
-        const conflictMarkerRegex = /<<<<<<< HEAD[\s\S]*?>>>>>>> .+/;
-        fileContent = fileContent.replace(conflictMarkerRegex, resolution);
-        fileModified = true;
+        decisions.push({ range: block.range, resolution, action: 'Applied', label });
         summary.push({ label, action: 'Applied' });
         console.log('  ✅ Applied.\n');
       } else {
+        decisions.push({ range: block.range, resolution: '', action: 'Skipped', label });
         summary.push({ label, action: 'Skipped' });
         console.log('  ⏭️  Skipped.\n');
       }
     }
 
-    if (fileModified) {
-      fs.writeFileSync(absPath, fileContent, 'utf-8');
+    const toApply = decisions
+      .filter((d) => d.action === 'Applied')
+      .sort((a, b) => b.range.start - a.range.start);
+
+    if (toApply.length > 0) {
+      let fileContent = fs.readFileSync(absPath, 'utf-8');
+      const lines = fileContent.split('\n');
+
+      for (const d of toApply) {
+        const startIdx = d.range.start - 1;
+        const endIdx = d.range.end - 1;
+        const resolutionLines = d.resolution.split('\n');
+        lines.splice(startIdx, endIdx - startIdx + 1, ...resolutionLines);
+      }
+
+      fs.writeFileSync(absPath, lines.join('\n'), 'utf-8');
       await git.add(absPath);
     }
   }
