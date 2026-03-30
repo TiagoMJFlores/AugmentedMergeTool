@@ -1,14 +1,6 @@
 import 'dotenv/config';
 import Anthropic from '@anthropic-ai/sdk';
-import type {
-  ConflictBlock,
-  TicketContext,
-} from '../context/buildConflictBlocks';
-
-export interface ResolveResult {
-  resolution: string;
-  explanation: string;
-}
+import type { ConflictBlock, ResolveResult } from './types.js';
 
 let _anthropic: Anthropic | null = null;
 

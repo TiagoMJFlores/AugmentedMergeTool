@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { buildPrompt, resolveConflict } from './resolveConflict';
-import type { ConflictBlock } from '../context/buildConflictBlocks';
+import { buildPrompt, resolveConflict } from './resolveConflict.js';
+import type { ConflictBlock } from './types.js';
 
 function makeBlock(overrides?: Partial<ConflictBlock>): ConflictBlock {
   return {

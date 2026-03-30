@@ -2,25 +2,9 @@ import 'dotenv/config';
 import * as fs from 'fs';
 import * as path from 'path';
 import simpleGit from 'simple-git';
-import { getLinearClient } from '../linear/linearClient';
-import { summariseIntent } from '../linear/intentSummarizer';
-
-export interface TicketContext {
-  ticketId: string;
-  intentSummary: string;
-}
-
-export interface ConflictSide {
-  content: string;
-  ticket: TicketContext | null;
-}
-
-export interface ConflictBlock {
-  ours: ConflictSide;
-  theirs: ConflictSide;
-  range: { start: number; end: number };
-  surroundingContext: string;
-}
+import { getLinearClient } from '../linear/linearClient.js';
+import { summariseIntent } from '../linear/intentSummarizer.js';
+import type { TicketContext, ConflictBlock } from './types.js';
 
 interface ParsedConflict {
   oursContent: string;
@@ -131,9 +115,6 @@ export function parseGitLogOutput(output: string): CommitInfo[] {
   return commits;
 }
 
-/**
- * Fetch commits that introduced changes for a given side of a conflict.
- */
 async function fetchCommitsForSide(
   repoDir: string,
   relativeFilePath: string,
@@ -160,9 +141,6 @@ async function fetchCommitsForSide(
   }
 }
 
-/**
- * Find the first ticket ID across a list of commits.
- */
 function findTicketId(commits: CommitInfo[]): string | null {
   for (const commit of commits) {
     const ticketId = commitToTicketId(commit.message);
@@ -171,9 +149,6 @@ function findTicketId(commits: CommitInfo[]): string | null {
   return null;
 }
 
-/**
- * Fetch a Linear ticket and summarise its intent. Returns null on any failure.
- */
 async function fetchTicketContext(
   ticketId: string | null
 ): Promise<TicketContext | null> {
