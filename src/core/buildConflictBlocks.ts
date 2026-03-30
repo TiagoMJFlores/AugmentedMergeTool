@@ -2,8 +2,7 @@ import 'dotenv/config';
 import * as fs from 'fs';
 import * as path from 'path';
 import simpleGit from 'simple-git';
-import { getLinearClient } from '../linear/linearClient.js';
-import { summariseIntent } from '../linear/intentSummarizer.js';
+import type { TicketProvider } from './providers/TicketProvider.js';
 import type { TicketContext, ConflictBlock } from './types.js';
 
 interface ParsedConflict {
@@ -150,21 +149,12 @@ function findTicketId(commits: CommitInfo[]): string | null {
 }
 
 async function fetchTicketContext(
+  provider: TicketProvider,
   ticketId: string | null
 ): Promise<TicketContext | null> {
   if (!ticketId) return null;
 
-  try {
-    const issue = await getLinearClient().issue(ticketId);
-    const intentSummary = await summariseIntent({
-      id: issue.identifier,
-      title: issue.title,
-      description: issue.description ?? '',
-    });
-    return { ticketId: issue.identifier, intentSummary };
-  } catch {
-    return null;
-  }
+  return provider.fetchTicket(ticketId);
 }
 
 /**
@@ -174,7 +164,8 @@ async function fetchTicketContext(
  * @returns Array of ConflictBlock, one per conflict in the file
  */
 export async function buildConflictBlocks(
-  filePath: string
+  filePath: string,
+  provider: TicketProvider
 ): Promise<ConflictBlock[]> {
   const fileContent = fs.readFileSync(filePath, 'utf-8');
   const parsed = parseConflictMarkers(fileContent);
@@ -212,8 +203,8 @@ export async function buildConflictBlocks(
     const theirsTicketId = findTicketId(theirsCommits);
 
     const [oursTicket, theirsTicket] = await Promise.all([
-      fetchTicketContext(oursTicketId),
-      fetchTicketContext(theirsTicketId),
+      fetchTicketContext(provider, oursTicketId),
+      fetchTicketContext(provider, theirsTicketId),
     ]);
 
     results.push({
