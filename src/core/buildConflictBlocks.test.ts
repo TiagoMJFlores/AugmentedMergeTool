@@ -3,7 +3,7 @@ import {
   parseConflictMarkers,
   commitToTicketId,
   parseGitLogOutput,
-} from './buildConflictBlocks';
+} from './buildConflictBlocks.js';
 
 describe('parseConflictMarkers', () => {
   it('should parse a single conflict block', () => {
@@ -105,13 +105,10 @@ describe('parseConflictMarkers', () => {
     const result = parseConflictMarkers(content);
 
     expect(result).toHaveLength(1);
-    // Context should start 20 lines before the <<<<<<< marker
     expect(result[0].surroundingContext).toContain('before-5');
     expect(result[0].surroundingContext).toContain('before-24');
-    // Context should extend 20 lines after the >>>>>>> marker
     expect(result[0].surroundingContext).toContain('after-0');
     expect(result[0].surroundingContext).toContain('after-19');
-    // Should not include lines outside ±20
     expect(result[0].surroundingContext).not.toContain('before-4');
     expect(result[0].surroundingContext).not.toContain('after-20');
   });
