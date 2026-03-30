@@ -1,0 +1,33 @@
+{
+  "name": "augmented-merge-tool",
+  "version": "1.0.0",
+  "description": "Essentialist AI merge conflict resolver — detects conflicts, extracts ticket intent from commit messages, resolves with Claude.",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/TiagoMJFlores/AugmentedMergeTool.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/TiagoMJFlores/AugmentedMergeTool/issues"
+  },
+  "homepage": "https://github.com/TiagoMJFlores/AugmentedMergeTool#readme",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.80.0",
+    "@linear/sdk": "^80.0.0",
+    "dotenv": "^17.3.1",
+    "simple-git": "^3.33.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.0",
+    "typescript": "^6.0.2",
+    "vitest": "^4.1.2"
+  }
+}
