@@ -2,7 +2,7 @@ import 'dotenv/config';
 import * as fs from 'fs';
 import * as path from 'path';
 import simpleGit from 'simple-git';
-import { linearClient } from '../linear/linearClient';
+import { getLinearClient } from '../linear/linearClient';
 import { summariseIntent } from '../linear/intentSummarizer';
 
 export interface TicketContext {
@@ -102,15 +102,21 @@ export function parseGitLogOutput(output: string): CommitInfo[] {
     const messageLines = restOfOutput.split('\n');
 
     let message = '';
+    let seenHeader = false;
     let foundBlank = false;
     for (const line of messageLines) {
+      if (!seenHeader) {
+        if (line.trim() !== '') {
+          seenHeader = true;
+        }
+        continue;
+      }
       if (!foundBlank) {
         if (line.trim() === '') {
           foundBlank = true;
         }
         continue;
       }
-      // First non-blank line after the blank separator is the commit message
       if (line.trim() !== '') {
         message = line.trim();
         break;
@@ -174,7 +180,7 @@ async function fetchTicketContext(
   if (!ticketId) return null;
 
   try {
-    const issue = await linearClient.issue(ticketId);
+    const issue = await getLinearClient().issue(ticketId);
     const intentSummary = await summariseIntent({
       id: issue.identifier,
       title: issue.title,

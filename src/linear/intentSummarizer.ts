@@ -1,17 +1,26 @@
 import 'dotenv/config';
 import Anthropic from '@anthropic-ai/sdk';
 
-if (!process.env.ANTHROPIC_API_KEY) {
-  throw new Error('ANTHROPIC_API_KEY is not set. Add it to your .env file.');
-}
+let _anthropic: Anthropic | null = null;
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+function getAnthropicClient(): Anthropic {
+  if (!_anthropic) {
+    if (!process.env.ANTHROPIC_API_KEY) {
+      throw new Error(
+        'ANTHROPIC_API_KEY is not set. Add it to your .env file.'
+      );
+    }
+    _anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  }
+  return _anthropic;
+}
 
 export async function summariseIntent(ticket: {
   id: string;
   title: string;
   description: string;
 }): Promise<string> {
+  const anthropic = getAnthropicClient();
   const msg = await anthropic.messages.create({
     model: 'claude-opus-4-5',
     max_tokens: 256,
