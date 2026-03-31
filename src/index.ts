@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 import 'dotenv/config';
 import simpleGit from 'simple-git';
 import * as fs from 'fs';
