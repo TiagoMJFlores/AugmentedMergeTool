@@ -4,7 +4,7 @@
   "description": "Essentialist AI merge conflict resolver — detects conflicts, extracts ticket intent from commit messages, resolves with Claude.",
   "main": "dist/index.js",
   "bin": {
-    "augmented-merge-tool": "dist/index.js"
+    "mergeagent": "dist/index.js"
   },
   "scripts": {
     "build": "tsc",
