@@ -42,6 +42,26 @@ const editorRoot = editorContainer;
 let editor: MonacoEditor;
 let state: GuiSessionState | null = null;
 
+function createFallbackEditor(): MonacoEditor {
+  const textarea = document.createElement('textarea');
+  textarea.id = 'ai-fallback-editor';
+  textarea.style.width = '100%';
+  textarea.style.height = '100%';
+  textarea.style.background = '#000f2e';
+  textarea.style.color = '#e5e7eb';
+  textarea.style.border = '1px solid #334155';
+  textarea.style.padding = '12px';
+  textarea.style.resize = 'none';
+  editorRoot.replaceChildren(textarea);
+
+  return {
+    getValue: () => textarea.value,
+    setValue: (value: string) => {
+      textarea.value = value;
+    },
+  };
+}
+
 function assertState(): GuiSessionState {
   if (!state) {
     throw new Error('State not loaded');
@@ -138,16 +158,26 @@ function loadMonaco(): Promise<void> {
 }
 
 async function init(): Promise<void> {
-  await loadMonaco();
-  editor = window.monaco.editor.create(editorRoot, {
-    value: '',
-    language: 'typescript',
-    automaticLayout: true,
-    minimap: { enabled: false },
-  });
+  editor = createFallbackEditor();
 
   wireActions();
   await refresh();
+
+  try {
+    await loadMonaco();
+    const currentValue = editor.getValue();
+    editorRoot.replaceChildren();
+    editor = window.monaco.editor.create(editorRoot, {
+      value: currentValue,
+      language: 'typescript',
+      automaticLayout: true,
+      minimap: { enabled: false },
+    });
+  } catch {
+    if (status && status.textContent?.trim() !== 'Pending action.') {
+      status.textContent = 'Using fallback editor (Monaco failed to load).';
+    }
+  }
 }
 
 void init();
