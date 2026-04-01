@@ -59,11 +59,11 @@ async function run(): Promise<void> {
   for (const relPath of conflictingFiles) {
     const absPath = `${process.cwd()}/${relPath}`;
     const blocks = await buildConflictBlocks(absPath, ticketProvider);
+    let fileContent = fs.readFileSync(absPath, 'utf-8');
 
     const decisions: {
       range: { start: number; end: number };
-      resolution: string;
-      action: ConflictSummaryEntry['action'];
+      resolution: string | null;
     }[] = [];
 
     for (let i = 0; i < blocks.length; i++) {
@@ -85,32 +85,33 @@ async function run(): Promise<void> {
       const summaryLabel = ticketPrefix ? `${ticketPrefix} · ${label}` : label;
 
       if (answer === 'u') {
-        decisions.push({ range: block.range, resolution: result.resolution, action: 'applied' });
+        decisions.push({ range: block.range, resolution: result.resolution });
         summary.push({ label: summaryLabel, action: 'applied' });
         printApplied();
       } else {
-        decisions.push({ range: block.range, resolution: '', action: 'skipped' });
+        decisions.push({ range: block.range, resolution: null });
         summary.push({ label: summaryLabel, action: 'skipped' });
         printSkipped();
       }
     }
 
-    const toApply = decisions
-      .filter((d) => d.action === 'applied')
-      .sort((a, b) => b.range.start - a.range.start);
-
-    if (toApply.length > 0) {
-      const fileContent = fs.readFileSync(absPath, 'utf-8');
-      const lines = fileContent.split('\n');
-
-      for (const d of toApply) {
-        const startIdx = d.range.start - 1;
-        const endIdx = d.range.end - 1;
-        const resolutionLines = d.resolution.split('\n');
-        lines.splice(startIdx, endIdx - startIdx + 1, ...resolutionLines);
+    let fileModified = false;
+    for (const decision of [...decisions].reverse()) {
+      if (decision.resolution === null) {
+        continue;
       }
 
-      fs.writeFileSync(absPath, lines.join('\n'), 'utf-8');
+      const lines = fileContent.split('\n');
+      const startIdx = decision.range.start - 1;
+      const endIdx = decision.range.end - 1;
+      const resolutionLines = decision.resolution.split('\n');
+      lines.splice(startIdx, endIdx - startIdx + 1, ...resolutionLines);
+      fileContent = lines.join('\n');
+      fileModified = true;
+    }
+
+    if (fileModified) {
+      fs.writeFileSync(absPath, fileContent, 'utf-8');
       await git.add(absPath);
     }
   }
