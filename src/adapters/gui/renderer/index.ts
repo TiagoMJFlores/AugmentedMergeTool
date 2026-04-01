@@ -71,12 +71,13 @@ function assertState(): GuiSessionState {
 
 function render(nextState: GuiSessionState): void {
   state = nextState;
+  const mergedPathLabel = nextState.mergedPath;
 
   if (nextState.total === 0) {
     if (status) {
       status.textContent = `No conflict markers found in MERGED file: ${nextState.mergedPath}`;
     }
-    if (progress) progress.textContent = '0 / 0';
+    if (progress) progress.textContent = `0 / 0 • ${mergedPathLabel}`;
     if (localInput) localInput.value = '';
     if (remoteInput) remoteInput.value = '';
     if (explanation) explanation.textContent = 'Open a file that still contains Git conflict markers.';
@@ -86,7 +87,7 @@ function render(nextState: GuiSessionState): void {
 
   const block = nextState.blocks[nextState.currentIndex];
   if (progress) {
-    progress.textContent = `Conflict ${nextState.currentIndex + 1} of ${nextState.total}`;
+    progress.textContent = `Conflict ${nextState.currentIndex + 1} of ${nextState.total} • ${mergedPathLabel}`;
   }
 
   if (localInput) localInput.value = block.ours;
