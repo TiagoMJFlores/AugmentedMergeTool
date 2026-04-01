@@ -27,24 +27,37 @@ export function parseConflictMarkers(fileContent: string): ParsedConflict[] {
   let i = 0;
   while (i < lines.length) {
     if (lines[i].startsWith('<<<<<<<')) {
-      const startLine = i + 1; // 1-indexed
-      const oursLines: string[] = [];
-      const theirsLines: string[] = [];
+      const startIdx = i;
+      let separatorIdx = -1;
+      let depth = 1;
+      let endIdx = -1;
 
       i++;
-      while (i < lines.length && !lines[i].startsWith('=======')) {
-        oursLines.push(lines[i]);
+      while (i < lines.length) {
+        const line = lines[i];
+        if (line.startsWith('<<<<<<<')) {
+          depth++;
+        } else if (line.startsWith('=======') && depth === 1 && separatorIdx === -1) {
+          separatorIdx = i;
+        } else if (line.startsWith('>>>>>>>')) {
+          depth--;
+          if (depth === 0) {
+            endIdx = i;
+            break;
+          }
+        }
         i++;
       }
 
-      // skip =======
-      i++;
-      while (i < lines.length && !lines[i].startsWith('>>>>>>>')) {
-        theirsLines.push(lines[i]);
-        i++;
+      if (separatorIdx === -1 || endIdx === -1) {
+        i = startIdx + 1;
+        continue;
       }
 
-      const endLine = i + 1; // 1-indexed
+      const startLine = startIdx + 1; // 1-indexed
+      const endLine = endIdx + 1; // 1-indexed
+      const oursLines = lines.slice(startIdx + 1, separatorIdx);
+      const theirsLines = lines.slice(separatorIdx + 1, endIdx);
 
       const contextStart = Math.max(0, startLine - 1 - 20);
       const contextEnd = Math.min(lines.length, endLine + 20);
@@ -56,6 +69,9 @@ export function parseConflictMarkers(fileContent: string): ParsedConflict[] {
         range: { start: startLine, end: endLine },
         surroundingContext,
       });
+
+      i = endIdx + 1;
+      continue;
     }
     i++;
   }

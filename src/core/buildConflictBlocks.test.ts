@@ -131,6 +131,71 @@ describe('parseConflictMarkers', () => {
     expect(result[0].oursContent).toBe('line 1 ours\nline 2 ours\nline 3 ours');
     expect(result[0].theirsContent).toBe('line 1 theirs\nline 2 theirs');
   });
+
+  it('should parse a nested conflict as a single outer block', () => {
+    const content = [
+      'def calculate_fee(amount):',
+      '<<<<<<< HEAD',
+      '<<<<<<< HEAD',
+      'if amount < 100:',
+      '    return amount * 0.03',
+      'return amount * 0.02',
+      '=======',
+      'return 1.50',
+      '>>>>>>> feature/async-processing',
+      '=======',
+      'return 1.50',
+      '>>>>>>> feature/async-processing',
+      'print("done")',
+    ].join('\n');
+
+    const result = parseConflictMarkers(content);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].range).toEqual({ start: 2, end: 12 });
+    expect(result[0].oursContent).toBe(
+      [
+        '<<<<<<< HEAD',
+        'if amount < 100:',
+        '    return amount * 0.03',
+        'return amount * 0.02',
+        '=======',
+        'return 1.50',
+        '>>>>>>> feature/async-processing',
+      ].join('\n')
+    );
+    expect(result[0].theirsContent).toBe('return 1.50');
+  });
+
+  it('should parse nested and regular conflicts in the same file', () => {
+    const content = [
+      'start',
+      '<<<<<<< HEAD',
+      '<<<<<<< HEAD',
+      'ours nested',
+      '=======',
+      'theirs nested inner',
+      '>>>>>>> branch-inner',
+      '=======',
+      'theirs nested outer',
+      '>>>>>>> branch-outer',
+      'middle',
+      '<<<<<<< HEAD',
+      'ours regular',
+      '=======',
+      'theirs regular',
+      '>>>>>>> branch-regular',
+      'end',
+    ].join('\n');
+
+    const result = parseConflictMarkers(content);
+
+    expect(result).toHaveLength(2);
+    expect(result[0].range).toEqual({ start: 2, end: 10 });
+    expect(result[1].range).toEqual({ start: 12, end: 16 });
+    expect(result[1].oursContent).toBe('ours regular');
+    expect(result[1].theirsContent).toBe('theirs regular');
+  });
 });
 
 describe('commitToTicketId', () => {
