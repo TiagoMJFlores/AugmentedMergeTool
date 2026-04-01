@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self' https: file:; script-src 'self' https: file: 'unsafe-eval'; style-src 'self' https: file: 'unsafe-inline'; font-src https: file: data:;"
+      content="default-src 'self' file:; script-src 'self' file:; style-src 'self' file: 'unsafe-inline'; font-src 'self' file: data:;"
     />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>MergeAgent GUI</title>
@@ -48,7 +48,9 @@
       <p id="status"></p>
     </main>
 
-    <script src="https://unpkg.com/monaco-editor@0.55.0/min/vs/loader.js"></script>
-    <script src="./index.js" type="module"></script>
+    <script>
+      window.exports = window.exports || {};
+    </script>
+    <script src="./index.js"></script>
   </body>
 </html>

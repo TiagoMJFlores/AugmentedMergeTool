@@ -1,22 +1,23 @@
-import type { GuiSessionState } from '../contracts.js';
-
 type MonacoEditor = {
   getValue: () => string;
   setValue: (value: string) => void;
 };
 
-declare global {
-  interface Window {
-    monaco: {
-      editor: {
-        create: (element: HTMLElement, options: Record<string, unknown>) => MonacoEditor;
-      };
-    };
-    require: {
-      config: (options: Record<string, unknown>) => void;
-      (deps: string[], callback: () => void): void;
-    };
-  }
+interface GuiConflictBlock {
+  ours: string;
+  theirs: string;
+  aiResult: string;
+  explanation: string;
+  appliedResolution: string | null;
+  actionTaken: boolean;
+}
+
+interface GuiSessionState {
+  mergedPath: string;
+  total: number;
+  currentIndex: number;
+  complete: boolean;
+  blocks: GuiConflictBlock[];
 }
 
 const progress = document.getElementById('progress');
@@ -156,34 +157,11 @@ function wireActions(): void {
   });
 }
 
-function loadMonaco(): Promise<void> {
-  return new Promise((resolve) => {
-    window.require.config({ paths: { vs: 'https://unpkg.com/monaco-editor@0.55.0/min/vs' } });
-    window.require(['vs/editor/editor.main'], () => resolve());
-  });
-}
-
 async function init(): Promise<void> {
   editor = createFallbackEditor();
 
   wireActions();
   await refresh();
-
-  try {
-    await loadMonaco();
-    const currentValue = editor.getValue();
-    editorRoot.replaceChildren();
-    editor = window.monaco.editor.create(editorRoot, {
-      value: currentValue,
-      language: 'typescript',
-      automaticLayout: true,
-      minimap: { enabled: false },
-    });
-  } catch {
-    if (status && status.textContent?.trim() !== 'Pending action.') {
-      status.textContent = 'Using fallback editor (Monaco failed to load).';
-    }
-  }
 }
 
 void init().catch((error: unknown) => {
