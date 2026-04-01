@@ -180,4 +180,13 @@ async function init(): Promise<void> {
   }
 }
 
-void init();
+void init().catch((error: unknown) => {
+  const message = error instanceof Error ? error.message : String(error);
+  if (status) {
+    status.textContent = `Failed to initialize GUI: ${message}`;
+  }
+  if (progress) {
+    progress.textContent = 'Initialization error';
+  }
+  console.error(error);
+});
