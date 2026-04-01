@@ -149,6 +149,36 @@ npx mergeagent --provider=github
 npx mergeagent --provider=none
 ```
 
+### Electron GUI merge tool (MVP)
+
+This repo now includes an Electron-based GUI adapter that reuses the same `src/core/*` merge engine.
+
+Build first:
+
+```bash
+npm run build
+```
+
+Launch GUI with Git mergetool-style positional args:
+
+```bash
+node dist/adapters/gui/main.js \"$LOCAL\" \"$BASE\" \"$REMOTE\" \"$MERGED\"
+```
+
+For quick local testing, you can also pass only the conflicted `MERGED` file:
+
+```bash
+node dist/adapters/gui/main.js \"/path/to/MERGED\"
+```
+
+The GUI provides:
+- LOCAL panel
+- REMOTE panel
+- editable AI RESULT editor
+- actions: Apply, Skip, Use LOCAL, Use REMOTE
+- conflict navigation + progress
+- final write to `MERGED` when finished
+
 
 ------------------------------------------------------------------------
 

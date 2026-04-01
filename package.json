@@ -4,13 +4,16 @@
   "description": "Essentialist AI merge conflict resolver — detects conflicts, extracts ticket intent from commit messages, resolves with Claude.",
   "main": "dist/index.js",
   "bin": {
-    "mergeagent": "dist/index.js"
+    "mergeagent": "dist/index.js",
+    "mergeagent-gui": "dist/adapters/gui/main.js"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && npm run copy:gui-assets",
     "start": "node dist/index.js",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "copy:gui-assets": "node -e \"const fs=require('fs');fs.mkdirSync('dist/adapters/gui/renderer',{recursive:true});fs.copyFileSync('src/adapters/gui/renderer/index.html','dist/adapters/gui/renderer/index.html');fs.copyFileSync('src/adapters/gui/renderer/styles.css','dist/adapters/gui/renderer/styles.css');\"",
+    "start:gui": "electron dist/adapters/gui/main.js"
   },
   "repository": {
     "type": "git",

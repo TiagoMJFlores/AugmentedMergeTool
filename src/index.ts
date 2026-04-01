@@ -17,6 +17,7 @@ import {
 } from './adapters/cli/display.js';
 import { askUserAction } from './adapters/cli/prompt.js';
 import type { ConflictSummaryEntry } from './core/types.js';
+import { applyResolutionsToContent } from './core/applyResolutions.js';
 
 const git = simpleGit();
 
@@ -95,22 +96,10 @@ async function run(): Promise<void> {
       }
     }
 
-    let fileModified = false;
-    for (const decision of [...decisions].reverse()) {
-      if (decision.resolution === null) {
-        continue;
-      }
+    const { content: nextContent, modified } = applyResolutionsToContent(fileContent, decisions);
 
-      const lines = fileContent.split('\n');
-      const startIdx = decision.range.start - 1;
-      const endIdx = decision.range.end - 1;
-      const resolutionLines = decision.resolution.split('\n');
-      lines.splice(startIdx, endIdx - startIdx + 1, ...resolutionLines);
-      fileContent = lines.join('\n');
-      fileModified = true;
-    }
-
-    if (fileModified) {
+    if (modified) {
+      fileContent = nextContent;
       fs.writeFileSync(absPath, fileContent, 'utf-8');
       await git.add(absPath);
     }
