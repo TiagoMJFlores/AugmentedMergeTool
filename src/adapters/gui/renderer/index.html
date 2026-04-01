@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self' https:; script-src 'self' https: 'unsafe-eval'; style-src 'self' https: 'unsafe-inline'; font-src https: data:;"
+    />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MergeAgent GUI</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header>
+      <h1>AI-assisted Merge Resolver</h1>
+      <div id="progress"></div>
+    </header>
+
+    <main>
+      <section class="top-grid">
+        <article>
+          <h2>LOCAL (HEAD)</h2>
+          <textarea id="local-content" readonly></textarea>
+        </article>
+        <article>
+          <h2>REMOTE (incoming)</h2>
+          <textarea id="remote-content" readonly></textarea>
+        </article>
+      </section>
+
+      <section class="result">
+        <h2>AI RESULT (Editable)</h2>
+        <div id="editor"></div>
+        <p id="explanation"></p>
+      </section>
+
+      <section class="controls">
+        <button id="prev-btn">Previous</button>
+        <button id="next-btn">Next</button>
+        <button id="resolve-btn">Regenerate AI</button>
+        <button id="apply-btn">Apply</button>
+        <button id="skip-btn">Skip</button>
+        <button id="use-local-btn">Use LOCAL</button>
+        <button id="use-remote-btn">Use REMOTE</button>
+        <button id="finish-btn">Write MERGED & Exit</button>
+      </section>
+
+      <p id="status"></p>
+    </main>
+
+    <script src="https://unpkg.com/monaco-editor@0.55.0/min/vs/loader.js"></script>
+    <script src="./index.js" type="module"></script>
+  </body>
+</html>

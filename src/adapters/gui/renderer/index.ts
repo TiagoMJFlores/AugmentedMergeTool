@@ -1,0 +1,153 @@
+import type { GuiSessionState } from '../contracts.js';
+
+type MonacoEditor = {
+  getValue: () => string;
+  setValue: (value: string) => void;
+};
+
+declare global {
+  interface Window {
+    monaco: {
+      editor: {
+        create: (element: HTMLElement, options: Record<string, unknown>) => MonacoEditor;
+      };
+    };
+    require: {
+      config: (options: Record<string, unknown>) => void;
+      (deps: string[], callback: () => void): void;
+    };
+  }
+}
+
+const progress = document.getElementById('progress');
+const localInput = document.getElementById('local-content') as HTMLTextAreaElement | null;
+const remoteInput = document.getElementById('remote-content') as HTMLTextAreaElement | null;
+const explanation = document.getElementById('explanation');
+const status = document.getElementById('status');
+const prevButton = document.getElementById('prev-btn') as HTMLButtonElement | null;
+const nextButton = document.getElementById('next-btn') as HTMLButtonElement | null;
+const resolveButton = document.getElementById('resolve-btn') as HTMLButtonElement | null;
+const applyButton = document.getElementById('apply-btn') as HTMLButtonElement | null;
+const skipButton = document.getElementById('skip-btn') as HTMLButtonElement | null;
+const localButton = document.getElementById('use-local-btn') as HTMLButtonElement | null;
+const remoteButton = document.getElementById('use-remote-btn') as HTMLButtonElement | null;
+const finishButton = document.getElementById('finish-btn') as HTMLButtonElement | null;
+const editorContainer = document.getElementById('editor');
+
+if (!editorContainer) {
+  throw new Error('editor container not found');
+}
+const editorRoot = editorContainer;
+
+let editor: MonacoEditor;
+let state: GuiSessionState | null = null;
+
+function assertState(): GuiSessionState {
+  if (!state) {
+    throw new Error('State not loaded');
+  }
+  return state;
+}
+
+function render(nextState: GuiSessionState): void {
+  state = nextState;
+
+  if (nextState.total === 0) {
+    if (status) status.textContent = 'No conflict markers found in MERGED file.';
+    if (progress) progress.textContent = '0 / 0';
+    editor.setValue('');
+    return;
+  }
+
+  const block = nextState.blocks[nextState.currentIndex];
+  if (progress) {
+    progress.textContent = `Conflict ${nextState.currentIndex + 1} of ${nextState.total}`;
+  }
+
+  if (localInput) localInput.value = block.ours;
+  if (remoteInput) remoteInput.value = block.theirs;
+  if (explanation) explanation.textContent = block.explanation || 'Generate AI to view explanation.';
+
+  editor.setValue(block.appliedResolution ?? block.aiResult);
+
+  if (status) {
+    status.textContent = block.actionTaken ? 'Action recorded for this conflict.' : 'Pending action.';
+  }
+
+  if (prevButton) prevButton.disabled = nextState.currentIndex === 0;
+  if (nextButton) nextButton.disabled = nextState.currentIndex === nextState.total - 1;
+  if (finishButton) finishButton.disabled = !nextState.complete;
+}
+
+async function refresh(): Promise<void> {
+  render(await window.mergeGuiApi.getState());
+}
+
+function wireActions(): void {
+  prevButton?.addEventListener('click', async () => {
+    const current = assertState();
+    render(await window.mergeGuiApi.navigateTo(current.currentIndex - 1));
+  });
+
+  nextButton?.addEventListener('click', async () => {
+    const current = assertState();
+    render(await window.mergeGuiApi.navigateTo(current.currentIndex + 1));
+  });
+
+  resolveButton?.addEventListener('click', async () => {
+    const current = assertState();
+    render(await window.mergeGuiApi.generateAiResolution({ conflictIndex: current.currentIndex }));
+  });
+
+  applyButton?.addEventListener('click', async () => {
+    const current = assertState();
+    render(
+      await window.mergeGuiApi.applyResolution({
+        conflictIndex: current.currentIndex,
+        mode: 'apply-ai',
+        editedResolution: editor.getValue(),
+      })
+    );
+  });
+
+  skipButton?.addEventListener('click', async () => {
+    const current = assertState();
+    render(await window.mergeGuiApi.applyResolution({ conflictIndex: current.currentIndex, mode: 'skip' }));
+  });
+
+  localButton?.addEventListener('click', async () => {
+    const current = assertState();
+    render(await window.mergeGuiApi.applyResolution({ conflictIndex: current.currentIndex, mode: 'use-local' }));
+  });
+
+  remoteButton?.addEventListener('click', async () => {
+    const current = assertState();
+    render(await window.mergeGuiApi.applyResolution({ conflictIndex: current.currentIndex, mode: 'use-remote' }));
+  });
+
+  finishButton?.addEventListener('click', async () => {
+    await window.mergeGuiApi.finish();
+  });
+}
+
+function loadMonaco(): Promise<void> {
+  return new Promise((resolve) => {
+    window.require.config({ paths: { vs: 'https://unpkg.com/monaco-editor@0.55.0/min/vs' } });
+    window.require(['vs/editor/editor.main'], () => resolve());
+  });
+}
+
+async function init(): Promise<void> {
+  await loadMonaco();
+  editor = window.monaco.editor.create(editorRoot, {
+    value: '',
+    language: 'typescript',
+    automaticLayout: true,
+    minimap: { enabled: false },
+  });
+
+  wireActions();
+  await refresh();
+}
+
+void init();
