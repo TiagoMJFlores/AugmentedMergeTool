@@ -18,6 +18,11 @@ async function createMainWindow(): Promise<void> {
     },
   });
 
+  const shouldOpenDevTools = process.env.MERGEAGENT_GUI_DEBUG === '1' || !app.isPackaged;
+  if (shouldOpenDevTools) {
+    mainWindow.webContents.openDevTools({ mode: 'detach' });
+  }
+
   await mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'));
 }
 

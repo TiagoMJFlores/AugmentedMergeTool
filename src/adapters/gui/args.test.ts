@@ -20,7 +20,34 @@ describe('parseMergeToolArgs', () => {
     });
   });
 
-  it('throws if required args are missing', () => {
-    expect(() => parseMergeToolArgs(['local.ts', 'base.ts'])).toThrow('Expected either 1 arg');
+  it('uses the last positional arg when extra launch args exist', () => {
+    expect(parseMergeToolArgs(['dist/adapters/gui/main.js', 'merged.ts'])).toEqual({
+      local: 'merged.ts',
+      base: 'merged.ts',
+      remote: 'merged.ts',
+      merged: 'merged.ts',
+    });
+  });
+
+  it('accepts two positional paths by using the last one as merged', () => {
+    expect(parseMergeToolArgs(['local.ts', 'merged.ts'])).toEqual({
+      local: 'merged.ts',
+      base: 'merged.ts',
+      remote: 'merged.ts',
+      merged: 'merged.ts',
+    });
+  });
+
+  it('ignores cli flags when parsing positional paths', () => {
+    expect(parseMergeToolArgs(['--inspect=9229', 'local.ts', 'base.ts', 'remote.ts', 'merged.ts'])).toEqual({
+      local: 'local.ts',
+      base: 'base.ts',
+      remote: 'remote.ts',
+      merged: 'merged.ts',
+    });
+  });
+
+  it('throws when no positional paths are provided', () => {
+    expect(() => parseMergeToolArgs(['--inspect=9229'])).toThrow('Expected at least 1 path');
   });
 });

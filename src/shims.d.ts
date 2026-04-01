@@ -1,6 +1,7 @@
 declare module 'electron' {
   export const app: {
     whenReady: () => Promise<void>;
+    isPackaged: boolean;
     on: (event: string, callback: () => void) => void;
     quit: () => void;
     exit: (code?: number) => void;
@@ -8,6 +9,9 @@ declare module 'electron' {
 
   export class BrowserWindow {
     constructor(options: Record<string, unknown>);
+    webContents: {
+      openDevTools: (options?: { mode?: 'detach' | 'right' | 'bottom' | 'undocked' }) => void;
+    };
     loadFile(filePath: string): Promise<void>;
   }
 
