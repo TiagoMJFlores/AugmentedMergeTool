@@ -73,8 +73,13 @@ function render(nextState: GuiSessionState): void {
   state = nextState;
 
   if (nextState.total === 0) {
-    if (status) status.textContent = 'No conflict markers found in MERGED file.';
+    if (status) {
+      status.textContent = `No conflict markers found in MERGED file: ${nextState.mergedPath}`;
+    }
     if (progress) progress.textContent = '0 / 0';
+    if (localInput) localInput.value = '';
+    if (remoteInput) remoteInput.value = '';
+    if (explanation) explanation.textContent = 'Open a file that still contains Git conflict markers.';
     editor.setValue('');
     return;
   }
