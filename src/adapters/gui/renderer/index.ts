@@ -162,6 +162,22 @@ async function init(): Promise<void> {
 
   wireActions();
   await refresh();
+
+  const current = assertState();
+  const currentBlock = current.blocks[current.currentIndex];
+  if (current.total > 0 && currentBlock && !currentBlock.aiResult) {
+    if (status) {
+      status.textContent = 'Generating initial AI suggestion...';
+    }
+    try {
+      render(await window.mergeGuiApi.generateAiResolution({ conflictIndex: current.currentIndex }));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (status) {
+        status.textContent = `Could not generate initial AI suggestion: ${message}`;
+      }
+    }
+  }
 }
 
 void init().catch((error: unknown) => {
