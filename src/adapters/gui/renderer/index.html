@@ -20,11 +20,16 @@
       <section class="top-grid">
         <article>
           <h2>LOCAL (HEAD)</h2>
-          <textarea id="local-content" readonly></textarea>
+          <div id="local-content" class="code-pane" aria-label="Local file content"></div>
+        </article>
+        <article class="middle-controls">
+          <button id="switch-direction-btn" class="direction-btn">➡️ Left → Right</button>
+          <button id="apply-direction-btn">Apply Left Side</button>
+          <button id="accept-both-btn">Accept Both</button>
         </article>
         <article>
           <h2>REMOTE (incoming)</h2>
-          <textarea id="remote-content" readonly></textarea>
+          <div id="remote-content" class="code-pane" aria-label="Remote file content"></div>
         </article>
       </section>
 
@@ -40,8 +45,6 @@
         <button id="resolve-btn">Regenerate AI</button>
         <button id="apply-btn">Apply</button>
         <button id="skip-btn">Skip</button>
-        <button id="use-local-btn">Use LOCAL</button>
-        <button id="use-remote-btn">Use REMOTE</button>
         <button id="finish-btn">Write MERGED & Exit</button>
       </section>
 

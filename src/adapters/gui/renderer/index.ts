@@ -17,12 +17,17 @@ interface GuiSessionState {
   total: number;
   currentIndex: number;
   complete: boolean;
+  localFullContent: string;
+  remoteFullContent: string;
   blocks: GuiConflictBlock[];
 }
 
 const progress = document.getElementById('progress');
-const localInput = document.getElementById('local-content') as HTMLTextAreaElement | null;
-const remoteInput = document.getElementById('remote-content') as HTMLTextAreaElement | null;
+const localPane = document.getElementById('local-content');
+const remotePane = document.getElementById('remote-content');
+const switchDirectionButton = document.getElementById('switch-direction-btn') as HTMLButtonElement | null;
+const applyDirectionButton = document.getElementById('apply-direction-btn') as HTMLButtonElement | null;
+const acceptBothButton = document.getElementById('accept-both-btn') as HTMLButtonElement | null;
 const explanation = document.getElementById('explanation');
 const status = document.getElementById('status');
 const prevButton = document.getElementById('prev-btn') as HTMLButtonElement | null;
@@ -30,8 +35,6 @@ const nextButton = document.getElementById('next-btn') as HTMLButtonElement | nu
 const resolveButton = document.getElementById('resolve-btn') as HTMLButtonElement | null;
 const applyButton = document.getElementById('apply-btn') as HTMLButtonElement | null;
 const skipButton = document.getElementById('skip-btn') as HTMLButtonElement | null;
-const localButton = document.getElementById('use-local-btn') as HTMLButtonElement | null;
-const remoteButton = document.getElementById('use-remote-btn') as HTMLButtonElement | null;
 const finishButton = document.getElementById('finish-btn') as HTMLButtonElement | null;
 const editorContainer = document.getElementById('editor');
 
@@ -42,6 +45,38 @@ const editorRoot = editorContainer;
 
 let editor: MonacoEditor;
 let state: GuiSessionState | null = null;
+let direction: 'left-to-right' | 'right-to-left' = 'left-to-right';
+
+function renderCodePane(container: HTMLElement | null, content: string, oppositeContent: string): void {
+  if (!container) return;
+
+  const lines = content.split('\n');
+  const oppositeLines = oppositeContent.split('\n');
+  const fragment = document.createDocumentFragment();
+
+  for (let index = 0; index < lines.length; index++) {
+    const lineElement = document.createElement('div');
+    lineElement.className = 'code-line';
+    if ((oppositeLines[index] ?? '') !== (lines[index] ?? '')) {
+      lineElement.classList.add('diff-line');
+    }
+    lineElement.textContent = lines[index] ?? '';
+    fragment.appendChild(lineElement);
+  }
+
+  container.replaceChildren(fragment);
+}
+
+function updateDirectionControls(): void {
+  if (switchDirectionButton) {
+    switchDirectionButton.textContent =
+      direction === 'left-to-right' ? '➡️ Left → Right' : '⬅️ Right → Left';
+  }
+  if (applyDirectionButton) {
+    applyDirectionButton.textContent =
+      direction === 'left-to-right' ? 'Apply Left Side' : 'Apply Right Side';
+  }
+}
 
 function createFallbackEditor(): MonacoEditor {
   const textarea = document.createElement('textarea');
@@ -79,8 +114,8 @@ function render(nextState: GuiSessionState): void {
       status.textContent = `No conflict markers found in MERGED file: ${nextState.mergedPath}`;
     }
     if (progress) progress.textContent = `0 / 0 • ${mergedPathLabel}`;
-    if (localInput) localInput.value = '';
-    if (remoteInput) remoteInput.value = '';
+    renderCodePane(localPane, '', '');
+    renderCodePane(remotePane, '', '');
     if (explanation) explanation.textContent = 'Open a file that still contains Git conflict markers.';
     editor.setValue('');
     return;
@@ -91,8 +126,8 @@ function render(nextState: GuiSessionState): void {
     progress.textContent = `Conflict ${nextState.currentIndex + 1} of ${nextState.total} • ${mergedPathLabel}`;
   }
 
-  if (localInput) localInput.value = block.ours;
-  if (remoteInput) remoteInput.value = block.theirs;
+  renderCodePane(localPane, nextState.localFullContent, nextState.remoteFullContent);
+  renderCodePane(remotePane, nextState.remoteFullContent, nextState.localFullContent);
   if (explanation) explanation.textContent = block.explanation || 'Generate AI to view explanation.';
 
   editor.setValue(block.appliedResolution ?? block.aiResult);
@@ -104,6 +139,7 @@ function render(nextState: GuiSessionState): void {
   if (prevButton) prevButton.disabled = nextState.currentIndex === 0;
   if (nextButton) nextButton.disabled = nextState.currentIndex === nextState.total - 1;
   if (finishButton) finishButton.disabled = !nextState.complete;
+  updateDirectionControls();
 }
 
 async function refresh(): Promise<void> {
@@ -142,14 +178,24 @@ function wireActions(): void {
     render(await window.mergeGuiApi.applyResolution({ conflictIndex: current.currentIndex, mode: 'skip' }));
   });
 
-  localButton?.addEventListener('click', async () => {
-    const current = assertState();
-    render(await window.mergeGuiApi.applyResolution({ conflictIndex: current.currentIndex, mode: 'use-local' }));
+  switchDirectionButton?.addEventListener('click', () => {
+    direction = direction === 'left-to-right' ? 'right-to-left' : 'left-to-right';
+    updateDirectionControls();
   });
 
-  remoteButton?.addEventListener('click', async () => {
+  applyDirectionButton?.addEventListener('click', async () => {
     const current = assertState();
-    render(await window.mergeGuiApi.applyResolution({ conflictIndex: current.currentIndex, mode: 'use-remote' }));
+    render(
+      await window.mergeGuiApi.applyResolution({
+        conflictIndex: current.currentIndex,
+        mode: direction === 'left-to-right' ? 'use-local' : 'use-remote',
+      })
+    );
+  });
+
+  acceptBothButton?.addEventListener('click', async () => {
+    const current = assertState();
+    render(await window.mergeGuiApi.applyResolution({ conflictIndex: current.currentIndex, mode: 'accept-both' }));
   });
 
   finishButton?.addEventListener('click', async () => {

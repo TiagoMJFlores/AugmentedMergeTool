@@ -22,10 +22,12 @@ export interface GuiSessionState {
   total: number;
   currentIndex: number;
   complete: boolean;
+  localFullContent: string;
+  remoteFullContent: string;
   blocks: GuiConflictBlock[];
 }
 
-export type ResolutionMode = 'apply-ai' | 'skip' | 'use-local' | 'use-remote';
+export type ResolutionMode = 'apply-ai' | 'skip' | 'use-local' | 'use-remote' | 'accept-both';
 
 export interface ResolveAndStoreInput {
   conflictIndex: number;

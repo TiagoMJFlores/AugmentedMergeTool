@@ -15,9 +15,76 @@ import type {
 interface SessionData {
   args: MergeToolArgs;
   originalMergedContent: string;
+  localFullContent: string;
+  remoteFullContent: string;
   sourceBlocks: ConflictBlock[];
   blocks: GuiConflictBlock[];
   currentIndex: number;
+}
+
+interface SideViews {
+  localContent: string;
+  remoteContent: string;
+}
+
+function buildSideViews(mergedContent: string): SideViews {
+  const lines = mergedContent.split('\n');
+  const localOutput: string[] = [];
+  const remoteOutput: string[] = [];
+
+  let i = 0;
+  while (i < lines.length) {
+    if (!lines[i].startsWith('<<<<<<<')) {
+      localOutput.push(lines[i]);
+      remoteOutput.push(lines[i]);
+      i++;
+      continue;
+    }
+
+    i++;
+    const localLines: string[] = [];
+    const remoteLines: string[] = [];
+    let depth = 1;
+    let readingRemote = false;
+
+    while (i < lines.length) {
+      const line = lines[i];
+      if (line.startsWith('<<<<<<<')) {
+        depth++;
+        if (readingRemote) {
+          remoteLines.push(line);
+        } else {
+          localLines.push(line);
+        }
+      } else if (line.startsWith('=======') && depth === 1) {
+        readingRemote = true;
+      } else if (line.startsWith('>>>>>>>')) {
+        depth--;
+        if (depth === 0) {
+          break;
+        }
+        if (readingRemote) {
+          remoteLines.push(line);
+        } else {
+          localLines.push(line);
+        }
+      } else if (readingRemote) {
+        remoteLines.push(line);
+      } else {
+        localLines.push(line);
+      }
+      i++;
+    }
+
+    localOutput.push(...localLines);
+    remoteOutput.push(...remoteLines);
+    i++;
+  }
+
+  return {
+    localContent: localOutput.join('\n'),
+    remoteContent: remoteOutput.join('\n'),
+  };
 }
 
 export class GuiSession {
@@ -28,6 +95,7 @@ export class GuiSession {
     const ticketProvider = createProvider({ provider: providerName });
 
     const originalMergedContent = fs.readFileSync(args.merged, 'utf-8');
+    const sideViews = buildSideViews(originalMergedContent);
     const sourceBlocks = await buildConflictBlocks(args.merged, ticketProvider);
     const blocks = sourceBlocks.map((block, index) => ({
       id: `conflict-${index + 1}`,
@@ -44,6 +112,8 @@ export class GuiSession {
     return new GuiSession({
       args,
       originalMergedContent,
+      localFullContent: sideViews.localContent,
+      remoteFullContent: sideViews.remoteContent,
       sourceBlocks,
       blocks,
       currentIndex: 0,
@@ -76,6 +146,8 @@ export class GuiSession {
       target.appliedResolution = target.ours;
     } else if (input.mode === 'use-remote') {
       target.appliedResolution = target.theirs;
+    } else if (input.mode === 'accept-both') {
+      target.appliedResolution = [target.ours, target.theirs].filter(Boolean).join('\n');
     } else {
       target.appliedResolution = input.editedResolution ?? target.aiResult;
     }
@@ -110,6 +182,8 @@ export class GuiSession {
       total: this.data.blocks.length,
       currentIndex: this.data.currentIndex,
       complete,
+      localFullContent: this.data.localFullContent,
+      remoteFullContent: this.data.remoteFullContent,
       blocks: this.data.blocks,
     };
   }
