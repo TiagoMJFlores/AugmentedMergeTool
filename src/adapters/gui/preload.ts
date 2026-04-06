@@ -6,7 +6,7 @@ const api: RendererApi = {
   generateAiResolution: (input) => ipcRenderer.invoke('gui:resolve', input),
   applyResolution: (input) => ipcRenderer.invoke('gui:apply', input),
   navigateTo: (index) => ipcRenderer.invoke('gui:navigate', index),
-  finish: () => ipcRenderer.invoke('gui:finish'),
+  finish: (finalContent) => ipcRenderer.invoke('gui:finish', finalContent),
 };
 
 contextBridge.exposeInMainWorld('mergeGuiApi', api);

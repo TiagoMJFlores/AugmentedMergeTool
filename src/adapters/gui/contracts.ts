@@ -9,12 +9,23 @@ export interface GuiConflictBlock {
   id: string;
   index: number;
   range: { start: number; end: number };
+  localRange: { start: number; end: number };
+  remoteRange: { start: number; end: number };
+  previewRange: { start: number; end: number };
   ours: string;
   theirs: string;
   aiResult: string;
   explanation: string;
   appliedResolution: string | null;
   actionTaken: boolean;
+  selectedSide: 'local' | 'remote' | 'both' | null;
+  selectedAction:
+    | 'choose-left'
+    | 'choose-right'
+    | 'choose-both-left-first'
+    | 'choose-both-right-first'
+    | 'choose-neither'
+    | null;
 }
 
 export interface GuiSessionState {
@@ -22,10 +33,20 @@ export interface GuiSessionState {
   total: number;
   currentIndex: number;
   complete: boolean;
+  localFullContent: string;
+  remoteFullContent: string;
+  previewContent: string;
+  previewLineOwners: number[];
   blocks: GuiConflictBlock[];
 }
 
-export type ResolutionMode = 'apply-ai' | 'skip' | 'use-local' | 'use-remote';
+export type ResolutionMode =
+  | 'apply-ai'
+  | 'skip'
+  | 'use-local'
+  | 'use-remote'
+  | 'accept-both'
+  | 'accept-both-right-first';
 
 export interface ResolveAndStoreInput {
   conflictIndex: number;
@@ -42,5 +63,5 @@ export interface RendererApi {
   generateAiResolution: (input: ResolveAndStoreInput) => Promise<GuiSessionState>;
   applyResolution: (input: ApplyResolutionInput) => Promise<GuiSessionState>;
   navigateTo: (index: number) => Promise<GuiSessionState>;
-  finish: () => Promise<void>;
+  finish: (finalContent?: string) => Promise<void>;
 }

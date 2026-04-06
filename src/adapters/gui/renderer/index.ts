@@ -1,15 +1,24 @@
-type MonacoEditor = {
-  getValue: () => string;
-  setValue: (value: string) => void;
-};
-
 interface GuiConflictBlock {
+  id: string;
+  index: number;
+  range: { start: number; end: number };
+  localRange: { start: number; end: number };
+  remoteRange: { start: number; end: number };
+  previewRange: { start: number; end: number };
   ours: string;
   theirs: string;
   aiResult: string;
   explanation: string;
   appliedResolution: string | null;
   actionTaken: boolean;
+  selectedSide: 'local' | 'remote' | 'both' | null;
+  selectedAction:
+    | 'choose-left'
+    | 'choose-right'
+    | 'choose-both-left-first'
+    | 'choose-both-right-first'
+    | 'choose-neither'
+    | null;
 }
 
 interface GuiSessionState {
@@ -17,50 +26,194 @@ interface GuiSessionState {
   total: number;
   currentIndex: number;
   complete: boolean;
+  localFullContent: string;
+  remoteFullContent: string;
+  previewContent: string;
+  previewLineOwners: number[];
   blocks: GuiConflictBlock[];
 }
 
 const progress = document.getElementById('progress');
-const localInput = document.getElementById('local-content') as HTMLTextAreaElement | null;
-const remoteInput = document.getElementById('remote-content') as HTMLTextAreaElement | null;
+const localPane = document.getElementById('local-content');
+const remotePane = document.getElementById('remote-content');
+const conflictGutter = document.getElementById('conflict-gutter');
 const explanation = document.getElementById('explanation');
 const status = document.getElementById('status');
+const actionsSelect = document.getElementById('actions-select') as HTMLSelectElement | null;
 const prevButton = document.getElementById('prev-btn') as HTMLButtonElement | null;
 const nextButton = document.getElementById('next-btn') as HTMLButtonElement | null;
 const resolveButton = document.getElementById('resolve-btn') as HTMLButtonElement | null;
 const applyButton = document.getElementById('apply-btn') as HTMLButtonElement | null;
 const skipButton = document.getElementById('skip-btn') as HTMLButtonElement | null;
-const localButton = document.getElementById('use-local-btn') as HTMLButtonElement | null;
-const remoteButton = document.getElementById('use-remote-btn') as HTMLButtonElement | null;
 const finishButton = document.getElementById('finish-btn') as HTMLButtonElement | null;
-const editorContainer = document.getElementById('editor');
+const resultEditor = document.getElementById('result-editor') as HTMLTextAreaElement | null;
 
-if (!editorContainer) {
-  throw new Error('editor container not found');
+if (!resultEditor) {
+  throw new Error('result editor not found');
 }
-const editorRoot = editorContainer;
 
-let editor: MonacoEditor;
 let state: GuiSessionState | null = null;
+let syncingScroll = false;
+let hasManualResultEdits = false;
+let centerResultOnNextRender = false;
 
-function createFallbackEditor(): MonacoEditor {
-  const textarea = document.createElement('textarea');
-  textarea.id = 'ai-fallback-editor';
-  textarea.style.width = '100%';
-  textarea.style.height = '100%';
-  textarea.style.background = '#000f2e';
-  textarea.style.color = '#e5e7eb';
-  textarea.style.border = '1px solid #334155';
-  textarea.style.padding = '12px';
-  textarea.style.resize = 'none';
-  editorRoot.replaceChildren(textarea);
+function computeHighlightRange(
+  totalLines: number,
+  activeConflictIndex: number,
+  lineOwners: number[],
+  fallbackRange: { start: number; end: number }
+): { start: number; end: number } {
+  const ownerLineIndexes = lineOwners
+    .map((owner, index) => (owner === activeConflictIndex ? index + 1 : -1))
+    .filter((lineNumber) => lineNumber > 0);
 
-  return {
-    getValue: () => textarea.value,
-    setValue: (value: string) => {
-      textarea.value = value;
-    },
-  };
+  const rawStart = ownerLineIndexes.length > 0 ? Math.min(...ownerLineIndexes) : fallbackRange.start;
+  const rawEnd = ownerLineIndexes.length > 0 ? Math.max(...ownerLineIndexes) : fallbackRange.end;
+  const safeTotal = Math.max(1, totalLines);
+  const clampedStart = Math.min(Math.max(1, rawStart), safeTotal);
+  const clampedEnd = Math.max(clampedStart, Math.min(rawEnd, safeTotal));
+  return { start: clampedStart, end: clampedEnd };
+}
+
+function renderCodePane(
+  container: HTMLElement | null,
+  content: string,
+  oppositeContent: string,
+  activeRange: { start: number; end: number }
+): void {
+  if (!container) return;
+
+  const lines = content.split('\n');
+  const oppositeLines = oppositeContent.split('\n');
+  const fragment = document.createDocumentFragment();
+
+  for (let index = 0; index < lines.length; index++) {
+    const lineNumber = index + 1;
+    const lineElement = document.createElement('div');
+    lineElement.className = 'code-line';
+    lineElement.dataset.line = String(lineNumber);
+    if ((oppositeLines[index] ?? '') !== (lines[index] ?? '')) {
+      lineElement.classList.add('diff-line');
+    }
+    if (lineNumber >= activeRange.start && lineNumber <= activeRange.end) {
+      lineElement.classList.add('active-line');
+    }
+    lineElement.textContent = lines[index] ?? '';
+    fragment.appendChild(lineElement);
+  }
+
+  container.replaceChildren(fragment);
+}
+
+function renderResultPane(
+  editor: HTMLTextAreaElement | null,
+  content: string,
+  activeConflictIndex: number,
+  lineOwners: number[],
+  fallbackRange: { start: number; end: number }
+): void {
+  if (!editor) return;
+  const lines = content.split('\n');
+  const highlightRange = computeHighlightRange(lines.length, activeConflictIndex, lineOwners, fallbackRange);
+  const clampedStart = highlightRange.start;
+  const clampedEnd = highlightRange.end;
+  const computed = getComputedStyle(editor);
+  const lineHeight = Number.parseFloat(computed.lineHeight) || 22;
+  const topPadding = Number.parseFloat(computed.paddingTop) || 8;
+  const startPx = topPadding + (clampedStart - 1) * lineHeight;
+  const endPx = topPadding + clampedEnd * lineHeight;
+
+  editor.style.background = `linear-gradient(
+      to bottom,
+      #0b1220 0px,
+      #0b1220 ${startPx}px,
+      rgba(239, 68, 68, 0.45) ${startPx}px,
+      rgba(239, 68, 68, 0.45) ${endPx}px,
+      #0b1220 ${endPx}px
+    )`;
+  editor.style.backgroundAttachment = 'local';
+
+  if (!hasManualResultEdits) {
+    editor.value = content;
+  }
+}
+
+function getArrowLabel(selectedSide: 'local' | 'remote' | 'both' | null): string {
+  if (selectedSide === 'local') return '←';
+  if (selectedSide === 'remote') return '→';
+  if (selectedSide === 'both') return '↔';
+  return '←';
+}
+
+function getNextMode(selectedSide: 'local' | 'remote' | 'both' | null): 'use-local' | 'use-remote' | 'accept-both' {
+  if (selectedSide === null) return 'use-local';
+  if (selectedSide === 'local') return 'use-remote';
+  if (selectedSide === 'remote') return 'accept-both';
+  return 'use-local';
+}
+
+function updateActionButtons(block: GuiConflictBlock): void {
+  if (actionsSelect) {
+    actionsSelect.value = block.selectedAction ?? 'choose-left';
+  }
+}
+
+function renderConflictArrows(nextState: GuiSessionState): void {
+  if (!conflictGutter || !localPane) return;
+  const gutterInner = document.createElement('div');
+  gutterInner.className = 'conflict-gutter-inner';
+  gutterInner.style.height = `${localPane.scrollHeight}px`;
+  const firstLine = localPane.querySelector('.code-line') as HTMLElement | null;
+  const lineHeight =
+    firstLine?.getBoundingClientRect().height || Number.parseFloat(getComputedStyle(localPane).lineHeight) || 20;
+
+  for (const block of nextState.blocks) {
+    const arrowButton = document.createElement('button');
+    arrowButton.className = `conflict-arrow${block.index === nextState.currentIndex ? ' active' : ''}`;
+    arrowButton.textContent = getArrowLabel(block.selectedSide);
+    arrowButton.title = `Conflict ${block.index + 1}: click to toggle selection direction`;
+    arrowButton.setAttribute('aria-label', `Conflict ${block.index + 1} selector`);
+
+    const midpointLine = Math.floor((block.localRange.start + block.localRange.end) / 2);
+    const topOffset = Math.max(0, (midpointLine - 1) * lineHeight);
+    arrowButton.style.top = `${Math.max(0, topOffset)}px`;
+    arrowButton.addEventListener('click', async () => {
+      centerResultOnNextRender = true;
+      const navigatedState = await window.mergeGuiApi.navigateTo(block.index);
+      const updatedState = await window.mergeGuiApi.applyResolution({
+        conflictIndex: block.index,
+        mode: getNextMode(navigatedState.blocks[block.index]?.selectedSide ?? null),
+      });
+      render(updatedState);
+    });
+    gutterInner.appendChild(arrowButton);
+  }
+
+  conflictGutter.replaceChildren(gutterInner);
+}
+
+function syncPaneScroll(source: HTMLElement): void {
+  if (syncingScroll) return;
+  syncingScroll = true;
+  const top = source.scrollTop;
+  if (localPane && source !== localPane) {
+    localPane.scrollTop = top;
+  }
+  if (remotePane && source !== remotePane) {
+    remotePane.scrollTop = top;
+  }
+  if (conflictGutter) {
+    conflictGutter.scrollTop = top;
+  }
+  syncingScroll = false;
+}
+
+function scrollActiveLineToCenter(container: HTMLElement | null): void {
+  if (!container) return;
+  const activeLine = container.querySelector('.active-line');
+  if (!(activeLine instanceof HTMLElement)) return;
+  const targetTop = Math.max(0, activeLine.offsetTop - container.clientHeight / 2 + activeLine.clientHeight / 2);
+  container.scrollTo({ top: targetTop, behavior: 'smooth' });
 }
 
 function assertState(): GuiSessionState {
@@ -79,10 +232,13 @@ function render(nextState: GuiSessionState): void {
       status.textContent = `No conflict markers found in MERGED file: ${nextState.mergedPath}`;
     }
     if (progress) progress.textContent = `0 / 0 • ${mergedPathLabel}`;
-    if (localInput) localInput.value = '';
-    if (remoteInput) remoteInput.value = '';
+    renderCodePane(localPane, '', '', { start: 0, end: 0 });
+    renderCodePane(remotePane, '', '', { start: 0, end: 0 });
+    renderResultPane(resultEditor, '', -1, [], { start: 0, end: 0 });
+    if (conflictGutter) {
+      conflictGutter.replaceChildren();
+    }
     if (explanation) explanation.textContent = 'Open a file that still contains Git conflict markers.';
-    editor.setValue('');
     return;
   }
 
@@ -91,19 +247,34 @@ function render(nextState: GuiSessionState): void {
     progress.textContent = `Conflict ${nextState.currentIndex + 1} of ${nextState.total} • ${mergedPathLabel}`;
   }
 
-  if (localInput) localInput.value = block.ours;
-  if (remoteInput) remoteInput.value = block.theirs;
+  renderCodePane(localPane, nextState.localFullContent, nextState.remoteFullContent, block.localRange);
+  renderCodePane(remotePane, nextState.remoteFullContent, nextState.localFullContent, block.remoteRange);
+  renderResultPane(
+    resultEditor,
+    nextState.previewContent,
+    nextState.currentIndex,
+    nextState.previewLineOwners,
+    block.previewRange
+  );
   if (explanation) explanation.textContent = block.explanation || 'Generate AI to view explanation.';
-
-  editor.setValue(block.appliedResolution ?? block.aiResult);
 
   if (status) {
     status.textContent = block.actionTaken ? 'Action recorded for this conflict.' : 'Pending action.';
   }
+  updateActionButtons(block);
 
-  if (prevButton) prevButton.disabled = nextState.currentIndex === 0;
-  if (nextButton) nextButton.disabled = nextState.currentIndex === nextState.total - 1;
+  if (prevButton) prevButton.disabled = nextState.total === 0;
+  if (nextButton) nextButton.disabled = nextState.total === 0;
   if (finishButton) finishButton.disabled = !nextState.complete;
+  renderConflictArrows(nextState);
+  scrollActiveLineToCenter(localPane);
+  scrollActiveLineToCenter(remotePane);
+  if (centerResultOnNextRender) {
+    centerResultOnNextRender = false;
+  }
+  if (localPane) {
+    queueMicrotask(() => syncPaneScroll(localPane));
+  }
 }
 
 async function refresh(): Promise<void> {
@@ -113,54 +284,80 @@ async function refresh(): Promise<void> {
 function wireActions(): void {
   prevButton?.addEventListener('click', async () => {
     const current = assertState();
-    render(await window.mergeGuiApi.navigateTo(current.currentIndex - 1));
+    centerResultOnNextRender = true;
+    const previousIndex =
+      current.total === 0
+        ? 0
+        : (current.currentIndex - 1 + current.total) % current.total;
+    render(await window.mergeGuiApi.navigateTo(previousIndex));
   });
 
   nextButton?.addEventListener('click', async () => {
     const current = assertState();
-    render(await window.mergeGuiApi.navigateTo(current.currentIndex + 1));
+    centerResultOnNextRender = true;
+    const nextIndex = current.total === 0 ? 0 : (current.currentIndex + 1) % current.total;
+    render(await window.mergeGuiApi.navigateTo(nextIndex));
   });
 
   resolveButton?.addEventListener('click', async () => {
     const current = assertState();
+    centerResultOnNextRender = true;
     render(await window.mergeGuiApi.generateAiResolution({ conflictIndex: current.currentIndex }));
   });
 
   applyButton?.addEventListener('click', async () => {
     const current = assertState();
+    centerResultOnNextRender = true;
     render(
       await window.mergeGuiApi.applyResolution({
         conflictIndex: current.currentIndex,
         mode: 'apply-ai',
-        editedResolution: editor.getValue(),
       })
     );
   });
 
   skipButton?.addEventListener('click', async () => {
     const current = assertState();
+    centerResultOnNextRender = true;
     render(await window.mergeGuiApi.applyResolution({ conflictIndex: current.currentIndex, mode: 'skip' }));
   });
 
-  localButton?.addEventListener('click', async () => {
+  actionsSelect?.addEventListener('change', async () => {
     const current = assertState();
-    render(await window.mergeGuiApi.applyResolution({ conflictIndex: current.currentIndex, mode: 'use-local' }));
+    centerResultOnNextRender = true;
+    const action = actionsSelect.value;
+    const mode =
+      action === 'choose-right'
+        ? 'use-remote'
+        : action === 'choose-both-left-first'
+          ? 'accept-both'
+          : action === 'choose-both-right-first'
+            ? 'accept-both-right-first'
+            : action === 'choose-neither'
+              ? 'skip'
+              : 'use-local';
+    render(await window.mergeGuiApi.applyResolution({ conflictIndex: current.currentIndex, mode }));
   });
 
-  remoteButton?.addEventListener('click', async () => {
-    const current = assertState();
-    render(await window.mergeGuiApi.applyResolution({ conflictIndex: current.currentIndex, mode: 'use-remote' }));
-  });
-
+  localPane?.addEventListener('scroll', () => syncPaneScroll(localPane));
+  remotePane?.addEventListener('scroll', () => syncPaneScroll(remotePane));
   finishButton?.addEventListener('click', async () => {
-    await window.mergeGuiApi.finish();
+    await window.mergeGuiApi.finish(resultEditor?.value);
+  });
+
+  resultEditor?.addEventListener('input', () => {
+    hasManualResultEdits = true;
+    const current = state;
+    if (!current) return;
+    const block = current.blocks[current.currentIndex];
+    if (!block) return;
+    renderResultPane(resultEditor, resultEditor.value, current.currentIndex, [], block.previewRange);
   });
 }
 
 async function init(): Promise<void> {
-  editor = createFallbackEditor();
-
   wireActions();
+  centerResultOnNextRender = true;
   await refresh();
 
   const current = assertState();
