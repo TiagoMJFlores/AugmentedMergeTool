@@ -13,7 +13,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "copy:gui-assets": "node -e \"const fs=require('fs');fs.mkdirSync('dist/adapters/gui/renderer',{recursive:true});fs.copyFileSync('src/adapters/gui/renderer/index.html','dist/adapters/gui/renderer/index.html');fs.copyFileSync('src/adapters/gui/renderer/styles.css','dist/adapters/gui/renderer/styles.css');fs.copyFileSync('src/adapters/gui/renderer/cjs-shim.js','dist/adapters/gui/renderer/cjs-shim.js');\"",
-    "start:gui": "npm run build && electron dist/adapters/gui/main.js"
+    "start:gui": "npm run build && npx electron dist/adapters/gui/main.js"
   },
   "repository": {
     "type": "git",
@@ -35,6 +35,7 @@
   "devDependencies": {
     "@types/node": "^25.5.0",
     "typescript": "^6.0.2",
+    "electron": "^35.0.0",
     "vitest": "^4.1.2"
   }
 }
