@@ -30,14 +30,30 @@ main {
   overflow: hidden;
 }
 
-.top-actions {
-  position: sticky;
-  top: 0;
-  z-index: 20;
-  background: #111827;
-  padding: 8px 0;
-  border-bottom: 1px solid #374151;
+/* ---------- Conflict navigation bar ---------- */
+
+.conflict-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
 }
+
+#conflict-indicator {
+  display: inline-block;
+  min-width: 72px;
+  text-align: center;
+  font-weight: 600;
+  font-size: 14px;
+  letter-spacing: 0.5px;
+  color: #e2e8f0;
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 20px;
+  padding: 6px 18px;
+}
+
+/* ---------- Code panes ---------- */
 
 .top-grid {
   display: grid;
@@ -48,6 +64,7 @@ main {
 }
 
 .code-pane {
+  position: relative; /* needed so child offsetTop is relative to this container */
   width: 100%;
   height: 32vh;
   min-height: 220px;
@@ -62,14 +79,56 @@ main {
   padding: 8px;
 }
 
+/* ---------- Result / AI section ---------- */
+
+.result-header {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
+.result-header h2 {
+  margin: 0;
+}
+
+.explanation-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #94a3b8;
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 12px;
+  padding: 2px 10px;
+}
+
 #editor {
   height: 320px;
   border: 1px solid #374151;
 }
 
 .code-line {
-  padding: 1px 6px;
+  padding: 2px 6px;
   min-width: max-content;
+  line-height: 1.6;
+}
+
+/* Inside the result-highlight overlay, code-line divs must have ZERO vertical
+   padding and inherit the parent's line-height so they stay pixel-aligned with
+   the textarea lines underneath.  Any mismatch accumulates across lines and
+   causes visible overlap / garbled text. */
+.result-highlight .code-line {
+  padding-top: 0;
+  padding-bottom: 0;
+  line-height: inherit;
+  color: transparent !important;
+}
+
+/* Ensure empty lines still occupy full line-height (an empty div has 0 height
+   because no line-box is generated, but the textarea always gives empty lines
+   full height). The pseudo-element forces a line-box to exist. */
+.result-highlight .code-line:empty::after {
+  content: '\00a0';
 }
 
 .diff-line {
@@ -216,12 +275,13 @@ main {
 .result .active-line {
   background: rgba(220, 38, 38, 0.42) !important;
   border-left: 3px solid #ef4444;
-  color: #fee2e2;
+  /* Do NOT set color here — the highlight overlay must keep text transparent
+     so it doesn't clash with the textarea text layer on top. */
 }
 
 .result {
   display: grid;
-  grid-template-rows: auto 56px minmax(0, 32vh);
+  grid-template-rows: auto auto minmax(0, 32vh);
   gap: 8px;
   min-height: 0;
 }
@@ -230,7 +290,13 @@ main {
   min-height: 56px;
   max-height: 56px;
   margin: 0;
+  padding: 10px 12px;
+  font-size: 13px;
+  line-height: 1.5;
   color: #cbd5e1;
+  background: #0f172a;
+  border: 1px solid #1e293b;
+  border-radius: 6px;
   overflow: auto;
 }
 
@@ -239,15 +305,29 @@ main {
   min-height: 0;
 }
 
-
 button {
   background: #2563eb;
   border: none;
   color: white;
   padding: 8px 12px;
   border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+button:hover:not(:disabled) {
+  background: #3b82f6;
 }
 
 button:disabled {
   background: #6b7280;
+  cursor: not-allowed;
+}
+
+#finish-btn {
+  background: #16a34a;
+}
+
+#finish-btn:hover:not(:disabled) {
+  background: #22c55e;
 }

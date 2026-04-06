@@ -16,14 +16,13 @@
     </header>
 
     <main>
-      <section class="top-actions controls">
-        <button id="prev-btn">⬆️ Previous conflict</button>
-        <button id="next-btn">⬇️ Next conflict</button>
+      <nav class="conflict-nav">
+        <button id="prev-btn" title="Previous conflict">Previous</button>
+        <span id="conflict-indicator"></span>
+        <button id="next-btn" title="Next conflict">Next</button>
         <button id="resolve-btn">Regenerate AI</button>
-        <button id="apply-btn">Apply AI Result</button>
-        <button id="skip-btn">Skip</button>
         <button id="finish-btn">Write MERGED & Exit</button>
-      </section>
+      </nav>
 
       <section class="top-grid">
         <article>
@@ -40,6 +39,9 @@
       </section>
 
       <section class="result">
+        <div class="result-header">
+          <div id="explanation-label" class="explanation-label"></div>
+        </div>
         <p id="explanation"></p>
         <div class="result-wrapper">
           <div id="result-highlight" class="result-highlight" aria-hidden="true"></div>
@@ -54,7 +56,6 @@
           <option value="choose-right">Choose right</option>
           <option value="choose-both-left-first">Choose both (left first)</option>
           <option value="choose-both-right-first">Choose both (right first)</option>
-          <option value="choose-neither">Choose neither</option>
         </select>
       </section>
 

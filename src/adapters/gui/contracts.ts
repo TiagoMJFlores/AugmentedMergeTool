@@ -24,7 +24,6 @@ export interface GuiConflictBlock {
     | 'choose-right'
     | 'choose-both-left-first'
     | 'choose-both-right-first'
-    | 'choose-neither'
     | null;
 }
 
@@ -42,7 +41,6 @@ export interface GuiSessionState {
 
 export type ResolutionMode =
   | 'apply-ai'
-  | 'skip'
   | 'use-local'
   | 'use-remote'
   | 'accept-both'

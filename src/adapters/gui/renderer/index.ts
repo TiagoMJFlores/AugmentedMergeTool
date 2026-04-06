@@ -17,7 +17,6 @@ interface GuiConflictBlock {
     | 'choose-right'
     | 'choose-both-left-first'
     | 'choose-both-right-first'
-    | 'choose-neither'
     | null;
 }
 
@@ -38,13 +37,13 @@ const localPane = document.getElementById('local-content');
 const remotePane = document.getElementById('remote-content');
 const conflictGutter = document.getElementById('conflict-gutter');
 const explanation = document.getElementById('explanation');
+const explanationLabel = document.getElementById('explanation-label');
+const conflictIndicator = document.getElementById('conflict-indicator');
 const status = document.getElementById('status');
 const actionsSelect = document.getElementById('actions-select') as HTMLSelectElement | null;
 const prevButton = document.getElementById('prev-btn') as HTMLButtonElement | null;
 const nextButton = document.getElementById('next-btn') as HTMLButtonElement | null;
 const resolveButton = document.getElementById('resolve-btn') as HTMLButtonElement | null;
-const applyButton = document.getElementById('apply-btn') as HTMLButtonElement | null;
-const skipButton = document.getElementById('skip-btn') as HTMLButtonElement | null;
 const finishButton = document.getElementById('finish-btn') as HTMLButtonElement | null;
 const resultEditor = document.getElementById('result-editor') as HTMLTextAreaElement | null;
 const resultHighlight = document.getElementById('result-highlight');
@@ -155,10 +154,10 @@ function renderResultPane(
 }
 
 function getArrowLabel(selectedSide: 'local' | 'remote' | 'both' | null): string {
-  if (selectedSide === 'local') return '←';
-  if (selectedSide === 'remote') return '→';
-  if (selectedSide === 'both') return '↔';
-  return '←';
+  if (selectedSide === 'local') return '\u2190';
+  if (selectedSide === 'remote') return '\u2192';
+  if (selectedSide === 'both') return '\u2194';
+  return '\u2190';
 }
 
 function getNextMode(selectedSide: 'local' | 'remote' | 'both' | null): 'use-local' | 'use-remote' | 'accept-both' {
@@ -224,12 +223,16 @@ function syncPaneScroll(source: HTMLElement): void {
   syncingScroll = false;
 }
 
-function scrollActiveLineToCenter(container: HTMLElement | null): void {
+function scrollActiveLineToCenter(container: HTMLElement | null, instant = false): void {
   if (!container) return;
   const activeLine = container.querySelector('.active-line');
   if (!(activeLine instanceof HTMLElement)) return;
   const targetTop = Math.max(0, activeLine.offsetTop - container.clientHeight / 2 + activeLine.clientHeight / 2);
-  container.scrollTo({ top: targetTop, behavior: 'smooth' });
+  if (instant) {
+    container.scrollTop = targetTop;
+  } else {
+    container.scrollTo({ top: targetTop, behavior: 'smooth' });
+  }
 }
 
 function assertState(): GuiSessionState {
@@ -247,7 +250,8 @@ function render(nextState: GuiSessionState): void {
     if (status) {
       status.textContent = `No conflict markers found in MERGED file: ${nextState.mergedPath}`;
     }
-    if (progress) progress.textContent = `0 / 0 • ${mergedPathLabel}`;
+    if (progress) progress.textContent = `0 / 0 \u2022 ${mergedPathLabel}`;
+    if (conflictIndicator) conflictIndicator.textContent = '';
     renderCodePane(localPane, '', '', { start: 0, end: 0 });
     renderCodePane(remotePane, '', '', { start: 0, end: 0 });
     renderResultPane(resultEditor, '', -1, [], { start: 0, end: 0 });
@@ -255,12 +259,19 @@ function render(nextState: GuiSessionState): void {
       conflictGutter.replaceChildren();
     }
     if (explanation) explanation.textContent = 'Open a file that still contains Git conflict markers.';
+    if (explanationLabel) explanationLabel.textContent = '';
     return;
   }
 
-  const block = nextState.blocks[nextState.currentIndex];
+  const idx = nextState.currentIndex;
+  const block = nextState.blocks[idx];
+
   if (progress) {
-    progress.textContent = `Conflict ${nextState.currentIndex + 1} of ${nextState.total} • ${mergedPathLabel}`;
+    progress.textContent = mergedPathLabel;
+  }
+
+  if (conflictIndicator) {
+    conflictIndicator.textContent = `${idx + 1} / ${nextState.total}`;
   }
 
   renderCodePane(localPane, nextState.localFullContent, nextState.remoteFullContent, block.localRange);
@@ -272,10 +283,16 @@ function render(nextState: GuiSessionState): void {
     nextState.previewLineOwners,
     block.previewRange
   );
-  if (explanation) explanation.textContent = block.explanation || 'Generate AI to view explanation.';
+
+  if (explanationLabel) {
+    explanationLabel.textContent = `Conflict ${idx + 1} of ${nextState.total}`;
+  }
+  if (explanation) {
+    explanation.textContent = block.explanation || 'Generating AI explanation...';
+  }
 
   if (status) {
-    status.textContent = block.actionTaken ? 'Action recorded for this conflict.' : 'Pending action.';
+    status.textContent = block.actionTaken ? 'AI resolution applied.' : 'Pending AI resolution...';
   }
   updateActionButtons(block);
 
@@ -283,9 +300,12 @@ function render(nextState: GuiSessionState): void {
   if (nextButton) nextButton.disabled = nextState.total === 0;
   if (finishButton) finishButton.disabled = !nextState.complete;
   renderConflictArrows(nextState);
-  scrollActiveLineToCenter(localPane);
-  scrollActiveLineToCenter(remotePane);
-  if (centerResultOnNextRender) {
+
+  const navigating = centerResultOnNextRender;
+  scrollActiveLineToCenter(localPane, navigating);
+  scrollActiveLineToCenter(remotePane, navigating);
+
+  if (navigating) {
     centerResultOnNextRender = false;
     if (resultHighlight && resultEditor) {
       const activeLine = resultHighlight.querySelector('.active-line');
@@ -298,8 +318,11 @@ function render(nextState: GuiSessionState): void {
         resultEditor.scrollTop = targetTop;
       }
     }
-  }
-  if (localPane) {
+    // Sync gutter after all panes have scrolled instantly
+    if (conflictGutter && localPane) {
+      conflictGutter.scrollTop = localPane.scrollTop;
+    }
+  } else if (localPane) {
     queueMicrotask(() => syncPaneScroll(localPane));
   }
 }
@@ -332,23 +355,6 @@ function wireActions(): void {
     render(await window.mergeGuiApi.generateAiResolution({ conflictIndex: current.currentIndex }));
   });
 
-  applyButton?.addEventListener('click', async () => {
-    const current = assertState();
-    centerResultOnNextRender = true;
-    render(
-      await window.mergeGuiApi.applyResolution({
-        conflictIndex: current.currentIndex,
-        mode: 'apply-ai',
-      })
-    );
-  });
-
-  skipButton?.addEventListener('click', async () => {
-    const current = assertState();
-    centerResultOnNextRender = true;
-    render(await window.mergeGuiApi.applyResolution({ conflictIndex: current.currentIndex, mode: 'skip' }));
-  });
-
   actionsSelect?.addEventListener('change', async () => {
     const current = assertState();
     centerResultOnNextRender = true;
@@ -360,9 +366,7 @@ function wireActions(): void {
           ? 'accept-both'
           : action === 'choose-both-right-first'
             ? 'accept-both-right-first'
-            : action === 'choose-neither'
-              ? 'skip'
-              : 'use-local';
+            : 'use-local';
     render(await window.mergeGuiApi.applyResolution({ conflictIndex: current.currentIndex, mode }));
   });
 
