@@ -493,8 +493,8 @@ describe('isWhitespaceOnlyDiff', () => {
     expect(isWhitespaceOnlyDiff('line1\nline2', 'line1\nline3')).toBe(false);
   });
 
-  it('should return false when blank lines are added or removed', () => {
-    expect(isWhitespaceOnlyDiff('line1\n\nline2', 'line1\nline2')).toBe(false);
+  it('should return true when blank lines are added or removed', () => {
+    expect(isWhitespaceOnlyDiff('line1\n\nline2', 'line1\nline2')).toBe(true);
   });
 });
 

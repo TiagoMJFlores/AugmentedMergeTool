@@ -36,7 +36,7 @@ export function validateResolution(resolution: string, index?: number): void {
 
 export function isWhitespaceOnlyDiff(a: string, b: string): boolean {
   const normalize = (s: string): string =>
-    s.split('\n').map((line) => line.replace(/\s+/g, ' ').trim()).join('\n');
+    s.split('\n').map((line) => line.replace(/\s+/g, ' ').trim()).filter(Boolean).join('\n');
   return normalize(a) === normalize(b);
 }
 
