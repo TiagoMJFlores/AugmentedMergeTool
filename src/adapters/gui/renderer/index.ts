@@ -13,6 +13,7 @@ interface GuiConflictBlock {
   actionTaken: boolean;
   selectedSide: 'local' | 'remote' | 'both' | null;
   selectedAction:
+    | 'choose-ai'
     | 'choose-left'
     | 'choose-right'
     | 'choose-both-left-first'
@@ -360,13 +361,15 @@ function wireActions(): void {
     centerResultOnNextRender = true;
     const action = actionsSelect.value;
     const mode =
-      action === 'choose-right'
-        ? 'use-remote'
-        : action === 'choose-both-left-first'
-          ? 'accept-both'
-          : action === 'choose-both-right-first'
-            ? 'accept-both-right-first'
-            : 'use-local';
+      action === 'choose-ai'
+        ? 'apply-ai'
+        : action === 'choose-right'
+          ? 'use-remote'
+          : action === 'choose-both-left-first'
+            ? 'accept-both'
+            : action === 'choose-both-right-first'
+              ? 'accept-both-right-first'
+              : 'use-local';
     render(await window.mergeGuiApi.applyResolution({ conflictIndex: current.currentIndex, mode }));
   });
 

@@ -258,6 +258,8 @@ export class GuiSession {
     target.aiResult = result.resolution;
     target.explanation = result.explanation;
     target.appliedResolution = result.resolution;
+    target.selectedAction = 'choose-ai';
+    target.selectedSide = null;
     target.actionTaken = true;
 
     return this.getState();
@@ -269,7 +271,11 @@ export class GuiSession {
       throw new Error(`Invalid conflict index: ${input.conflictIndex}`);
     }
 
-    if (input.mode === 'use-local') {
+    if (input.mode === 'apply-ai') {
+      target.appliedResolution = target.aiResult || null;
+      target.selectedSide = null;
+      target.selectedAction = 'choose-ai';
+    } else if (input.mode === 'use-local') {
       target.appliedResolution = target.ours;
       target.selectedSide = 'local';
       target.selectedAction = 'choose-left';

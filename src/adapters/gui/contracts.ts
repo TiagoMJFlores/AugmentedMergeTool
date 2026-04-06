@@ -20,6 +20,7 @@ export interface GuiConflictBlock {
   actionTaken: boolean;
   selectedSide: 'local' | 'remote' | 'both' | null;
   selectedAction:
+    | 'choose-ai'
     | 'choose-left'
     | 'choose-right'
     | 'choose-both-left-first'
