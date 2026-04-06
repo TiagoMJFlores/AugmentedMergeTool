@@ -120,6 +120,14 @@ main {
   padding-top: 0;
   padding-bottom: 0;
   line-height: inherit;
+  color: transparent !important;
+}
+
+/* Ensure empty lines still occupy full line-height (an empty div has 0 height
+   because no line-box is generated, but the textarea always gives empty lines
+   full height). The pseudo-element forces a line-box to exist. */
+.result-highlight .code-line:empty::after {
+  content: '\00a0';
 }
 
 .diff-line {
@@ -266,7 +274,8 @@ main {
 .result .active-line {
   background: rgba(220, 38, 38, 0.42) !important;
   border-left: 3px solid #ef4444;
-  color: #fee2e2;
+  /* Do NOT set color here — the highlight overlay must keep text transparent
+     so it doesn't clash with the textarea text layer on top. */
 }
 
 .result {
