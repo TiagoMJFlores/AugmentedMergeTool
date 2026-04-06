@@ -426,6 +426,11 @@ describe('validateResolution', () => {
     expect(() => validateResolution('const x = 2;\n>>>>>>> branch')).toThrow('leftover conflict markers');
   });
 
+  it('should NOT throw for markdown heading underlines with =======', () => {
+    // Markdown uses ======= under headings but with text on the same line or content after
+    expect(() => validateResolution('Title\n======= extra')).not.toThrow();
+  });
+
   it('should include conflict index in error message when provided', () => {
     expect(() => validateResolution('<<<<<<< HEAD', 2)).toThrow('Conflict 3 resolution');
   });
@@ -488,6 +493,10 @@ describe('isWhitespaceOnlyDiff', () => {
 
   it('should return false for different line count with different content', () => {
     expect(isWhitespaceOnlyDiff('line1\nline2', 'line1\nline3')).toBe(false);
+  });
+
+  it('should return false when blank lines are added or removed', () => {
+    expect(isWhitespaceOnlyDiff('line1\n\nline2', 'line1\nline2')).toBe(false);
   });
 });
 

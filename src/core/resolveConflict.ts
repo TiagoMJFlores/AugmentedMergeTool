@@ -30,7 +30,10 @@ function getCache(): ResolutionCache | null {
 
 // --- Feature 1: Output Validation ---
 
-const CONFLICT_MARKER_PATTERN = /^(<{7}|={7}|>{7})\s?/m;
+// Match actual Git conflict markers: <<<<<<< and >>>>>>> are always followed
+// by a space and branch/ref name.  ======= stands alone on its line.
+// This avoids false positives on markdown headings that use =======.
+const CONFLICT_MARKER_PATTERN = /^<{7} .+|^>{7} .+|^={7}$/m;
 
 export function validateResolution(resolution: string, index?: number): void {
   if (CONFLICT_MARKER_PATTERN.test(resolution)) {
@@ -45,7 +48,7 @@ export function validateResolution(resolution: string, index?: number): void {
 
 export function isWhitespaceOnlyDiff(a: string, b: string): boolean {
   const normalize = (s: string): string =>
-    s.split('\n').map((line) => line.replace(/\s+/g, ' ').trim()).filter(Boolean).join('\n');
+    s.split('\n').map((line) => line.replace(/\s+/g, ' ').trim()).join('\n');
   return normalize(a) === normalize(b);
 }
 
@@ -164,9 +167,7 @@ ${baseContent}
 `;
 }
 
-export function buildPrompt(block: ConflictBlock): string {
-  const windowed = applyWindowing(block);
-
+function buildPromptFromWindowed(windowed: ConflictBlock): string {
   const oursTicket = windowed.ours.ticket
     ? `Ticket ${windowed.ours.ticket.ticketId}: ${windowed.ours.ticket.intentSummary}`
     : 'No ticket associated.';
@@ -220,6 +221,10 @@ ${windowed.surroundingContext}
 Respond with ONLY the JSON object. No markdown, no code fences, no preamble.`;
 }
 
+export function buildPrompt(block: ConflictBlock): string {
+  return buildPromptFromWindowed(applyWindowing(block));
+}
+
 export async function resolveConflict(
   block: ConflictBlock
 ): Promise<ResolveResult> {
@@ -231,15 +236,20 @@ export async function resolveConflict(
     };
   }
 
-  // Feature 3: Cache lookup
+  // Apply windowing first — cache key must match what the prompt actually sends
+  const windowed = applyWindowing(block);
+
+  // Feature 3: Cache lookup (uses windowed content to match prompt)
   const cache = getCache();
-  if (cache) {
-    const key = cache.computeKey(block.baseContent, block.ours.content, block.theirs.content);
-    const cached = cache.get(key);
+  const cacheKey = cache?.computeKey(
+    windowed.baseContent, windowed.ours.content, windowed.theirs.content, windowed.surroundingContext
+  );
+  if (cache && cacheKey) {
+    const cached = cache.get(cacheKey);
     if (cached) return cached;
   }
 
-  const prompt = buildPrompt(block);
+  const prompt = buildPromptFromWindowed(windowed);
   const anthropic = getAnthropicClient();
 
   const message = await anthropic.messages.create({
@@ -267,9 +277,8 @@ export async function resolveConflict(
   validateResolution(result.resolution);
 
   // Feature 3: Cache store
-  if (cache) {
-    const key = cache.computeKey(block.baseContent, block.ours.content, block.theirs.content);
-    cache.set(key, result);
+  if (cache && cacheKey) {
+    cache.set(cacheKey, result);
   }
 
   return result;
@@ -361,9 +370,12 @@ export async function resolveAllConflicts(
       continue;
     }
 
-    // Feature 3: Cache lookup
+    // Feature 3: Cache lookup (use windowed content to match prompt)
     if (cache) {
-      const key = cache.computeKey(block.baseContent, block.ours.content, block.theirs.content);
+      const windowed = applyWindowing(block);
+      const key = cache.computeKey(
+        windowed.baseContent, windowed.ours.content, windowed.theirs.content, windowed.surroundingContext
+      );
       const cached = cache.get(key);
       if (cached) {
         results[i] = cached;
@@ -380,10 +392,9 @@ export async function resolveAllConflicts(
     return results as ResolveResult[];
   }
 
-  // Single uncached block — use single resolve
+  // Single uncached block — delegate to resolveConflict (handles its own caching)
   if (uncachedBlocks.length === 1) {
-    const result = await resolveConflict(uncachedBlocks[0]);
-    results[uncachedIndexes[0]] = result;
+    results[uncachedIndexes[0]] = await resolveConflict(uncachedBlocks[0]);
     return results as ResolveResult[];
   }
 
@@ -432,10 +443,12 @@ export async function resolveAllConflicts(
 
     results[uncachedIndexes[j]] = result;
 
-    // Feature 3: Cache store
+    // Feature 3: Cache store (windowed content to match key)
     if (cache) {
-      const block = uncachedBlocks[j];
-      const key = cache.computeKey(block.baseContent, block.ours.content, block.theirs.content);
+      const windowed = applyWindowing(uncachedBlocks[j]);
+      const key = cache.computeKey(
+        windowed.baseContent, windowed.ours.content, windowed.theirs.content, windowed.surroundingContext
+      );
       cache.set(key, result);
     }
   }

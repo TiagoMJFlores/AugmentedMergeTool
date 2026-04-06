@@ -19,13 +19,15 @@ export class ResolutionCache {
     this.maxEntries = maxEntries;
   }
 
-  computeKey(baseContent: string, oursContent: string, theirsContent: string): string {
+  computeKey(baseContent: string, oursContent: string, theirsContent: string, surroundingContext = ''): string {
     const hash = crypto.createHash('md5');
     hash.update(baseContent);
     hash.update('||');
     hash.update(oursContent);
     hash.update('||');
     hash.update(theirsContent);
+    hash.update('||');
+    hash.update(surroundingContext);
     return hash.digest('hex');
   }
 

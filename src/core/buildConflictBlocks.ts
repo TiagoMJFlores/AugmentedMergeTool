@@ -231,8 +231,39 @@ export async function buildConflictBlocks(
 
     let baseContent = '';
     if (baseLines) {
-      const baseStart = Math.max(0, conflict.range.start - 1);
-      const baseEnd = Math.min(baseLines.length, conflict.range.end - 1);
+      // The merged file's line numbers include conflict markers, so they don't
+      // map directly to the base file.  Instead, find the base region by
+      // looking for the lines immediately before and after the conflict in the
+      // merged file (which are non-conflict lines present in all three versions)
+      // and locating those anchors in the base.
+      const mergedLines = fileContent.split('\n');
+      const anchorBefore = conflict.range.start > 1
+        ? mergedLines[conflict.range.start - 2]  // line before <<<<<<<
+        : null;
+      const anchorAfter = conflict.range.end < mergedLines.length
+        ? mergedLines[conflict.range.end]  // line after >>>>>>>
+        : null;
+
+      let baseStart = 0;
+      let baseEnd = baseLines.length;
+
+      if (anchorBefore !== null) {
+        for (let bi = 0; bi < baseLines.length; bi++) {
+          if (baseLines[bi] === anchorBefore) {
+            baseStart = bi + 1;
+            break;
+          }
+        }
+      }
+      if (anchorAfter !== null) {
+        for (let bi = baseStart; bi < baseLines.length; bi++) {
+          if (baseLines[bi] === anchorAfter) {
+            baseEnd = bi;
+            break;
+          }
+        }
+      }
+
       baseContent = baseLines.slice(baseStart, baseEnd).join('\n');
     }
 

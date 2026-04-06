@@ -21,15 +21,15 @@ describe('ResolutionCache', () => {
   });
 
   it('should compute a deterministic key from content', () => {
-    const key1 = cache.computeKey('base', 'ours', 'theirs');
-    const key2 = cache.computeKey('base', 'ours', 'theirs');
+    const key1 = cache.computeKey('base', 'ours', 'theirs', 'ctx');
+    const key2 = cache.computeKey('base', 'ours', 'theirs', 'ctx');
     expect(key1).toBe(key2);
     expect(key1).toMatch(/^[a-f0-9]{32}$/);
   });
 
   it('should produce different keys for different content', () => {
-    const key1 = cache.computeKey('base', 'ours1', 'theirs');
-    const key2 = cache.computeKey('base', 'ours2', 'theirs');
+    const key1 = cache.computeKey('base', 'ours1', 'theirs', 'ctx');
+    const key2 = cache.computeKey('base', 'ours2', 'theirs', 'ctx');
     expect(key1).not.toBe(key2);
   });
 
@@ -39,7 +39,7 @@ describe('ResolutionCache', () => {
   });
 
   it('should store and retrieve a result', () => {
-    const key = cache.computeKey('', 'a', 'b');
+    const key = cache.computeKey('', 'a', 'b', '');
     const result = { resolution: 'merged', explanation: 'test' };
 
     cache.set(key, result);
@@ -65,7 +65,7 @@ describe('ResolutionCache', () => {
   it('should evict oldest entries when max is exceeded', () => {
     // Set 6 entries with max 5
     for (let i = 0; i < 6; i++) {
-      const key = cache.computeKey('', `ours-${i}`, 'theirs');
+      const key = cache.computeKey('', `ours-${i}`, 'theirs', '');
       cache.set(key, { resolution: `res-${i}`, explanation: `exp-${i}` });
     }
 
@@ -74,7 +74,7 @@ describe('ResolutionCache', () => {
   });
 
   it('should clear all entries', () => {
-    cache.set(cache.computeKey('', 'a', 'b'), { resolution: 'r', explanation: 'e' });
+    cache.set(cache.computeKey('', 'a', 'b', ''), { resolution: 'r', explanation: 'e' });
     cache.set(cache.computeKey('', 'c', 'd'), { resolution: 'r2', explanation: 'e2' });
 
     cache.clear();
