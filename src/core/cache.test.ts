@@ -49,12 +49,16 @@ describe('ResolutionCache', () => {
   });
 
   it('should return null for expired entries', () => {
-    const expiredCache = new ResolutionCache(TEST_CACHE_DIR, 0, 5); // 0 hours TTL
-    const key = expiredCache.computeKey('', 'a', 'b');
-    expiredCache.set(key, { resolution: 'old', explanation: 'expired' });
+    const key = cache.computeKey('', 'expired', 'test');
+    // Write the entry manually with a createdAt in the past
+    const entryPath = path.join(TEST_CACHE_DIR, `${key}.json`);
+    fs.mkdirSync(TEST_CACHE_DIR, { recursive: true });
+    fs.writeFileSync(entryPath, JSON.stringify({
+      result: { resolution: 'old', explanation: 'expired' },
+      createdAt: Date.now() - 25 * 60 * 60 * 1000, // 25 hours ago, exceeds 24h TTL
+    }));
 
-    // Entry was just created but TTL is 0, so it's immediately expired
-    const result = expiredCache.get(key);
+    const result = cache.get(key);
     expect(result).toBeNull();
   });
 

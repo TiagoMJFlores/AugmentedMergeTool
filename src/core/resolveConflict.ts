@@ -68,13 +68,85 @@ export function windowContent(text: string, maxTokens: number): string {
   return [...head, `\n... [${lines.length - keepLines} lines truncated] ...\n`, ...tail].join('\n');
 }
 
+/**
+ * Smart-window conflict sides: compare ours vs theirs line-by-line, keep all
+ * lines that actually differ plus `contextLines` identical lines around each
+ * diff region.  Long stretches of identical lines in between are collapsed
+ * with a truncation marker.  This preserves every meaningful difference while
+ * cutting boilerplate that is the same on both sides.
+ */
+export function windowConflictSides(
+  ours: string,
+  theirs: string,
+  contextLines = 5,
+  maxTokens = 3000
+): { ours: string; theirs: string } {
+  // Skip if both sides are small enough
+  if (estimateTokens(ours) + estimateTokens(theirs) <= maxTokens * 2) {
+    return { ours, theirs };
+  }
+
+  const oursLines = ours.split('\n');
+  const theirsLines = theirs.split('\n');
+  const maxLen = Math.max(oursLines.length, theirsLines.length);
+
+  // Mark which lines differ
+  const isDiff: boolean[] = [];
+  for (let i = 0; i < maxLen; i++) {
+    isDiff[i] = (oursLines[i] ?? '') !== (theirsLines[i] ?? '');
+  }
+
+  // Expand diff regions by contextLines in each direction
+  const keep = new Set<number>();
+  // Always keep first and last few lines for structural context
+  for (let i = 0; i < Math.min(contextLines, maxLen); i++) keep.add(i);
+  for (let i = Math.max(0, maxLen - contextLines); i < maxLen; i++) keep.add(i);
+
+  for (let i = 0; i < maxLen; i++) {
+    if (isDiff[i]) {
+      for (let j = Math.max(0, i - contextLines); j <= Math.min(maxLen - 1, i + contextLines); j++) {
+        keep.add(j);
+      }
+    }
+  }
+
+  // If everything is kept, return as-is
+  if (keep.size >= maxLen) return { ours, theirs };
+
+  // Build windowed output
+  const sortedKeep = [...keep].sort((a, b) => a - b);
+  const buildWindowed = (lines: string[]): string => {
+    const result: string[] = [];
+    let lastIdx = -1;
+    for (const idx of sortedKeep) {
+      if (lastIdx >= 0 && idx - lastIdx > 1) {
+        const skipped = idx - lastIdx - 1;
+        result.push(`... [${skipped} identical lines truncated] ...`);
+      }
+      result.push(lines[idx] ?? '');
+      lastIdx = idx;
+    }
+    return result.join('\n');
+  };
+
+  return {
+    ours: buildWindowed(oursLines),
+    theirs: buildWindowed(theirsLines),
+  };
+}
+
 function applyWindowing(block: ConflictBlock): ConflictBlock {
   const maxTokens = Number(process.env.MAX_CONFLICT_TOKENS) || 3000;
-  // Only window surrounding context and base — never truncate the actual
-  // conflict content (ours/theirs) since those are the lines the LLM must
-  // resolve and any truncation would lose essential information.
+  const { ours: windowedOurs, theirs: windowedTheirs } = windowConflictSides(
+    block.ours.content,
+    block.theirs.content,
+    5,
+    maxTokens
+  );
   return {
     ...block,
+    ours: { ...block.ours, content: windowedOurs },
+    theirs: { ...block.theirs, content: windowedTheirs },
     surroundingContext: windowContent(block.surroundingContext, maxTokens),
     baseContent: windowContent(block.baseContent, maxTokens),
   };

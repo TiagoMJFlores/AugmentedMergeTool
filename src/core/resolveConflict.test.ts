@@ -8,6 +8,7 @@ import {
   isWhitespaceOnlyDiff,
   estimateTokens,
   windowContent,
+  windowConflictSides,
 } from './resolveConflict.js';
 import type { ConflictBlock } from './types.js';
 
@@ -518,5 +519,60 @@ describe('token windowing', () => {
 
   it('estimateTokens should approximate text length / 4', () => {
     expect(estimateTokens('a'.repeat(400))).toBe(100);
+  });
+});
+
+describe('windowConflictSides', () => {
+  it('should return small content unchanged', () => {
+    const { ours, theirs } = windowConflictSides('line1\nline2', 'line1\nline3');
+    expect(ours).toBe('line1\nline2');
+    expect(theirs).toBe('line1\nline3');
+  });
+
+  it('should truncate identical stretches in large conflicts', () => {
+    // 100 identical lines, then 1 diff, then 100 more identical lines
+    const shared = Array.from({ length: 100 }, (_, i) => `shared-${i}`);
+    const oursLines = [...shared, 'OURS CHANGE', ...shared];
+    const theirsLines = [...shared, 'THEIRS CHANGE', ...shared];
+    const ours = oursLines.join('\n');
+    const theirs = theirsLines.join('\n');
+
+    // Force windowing with low maxTokens
+    const result = windowConflictSides(ours, theirs, 3, 50);
+
+    expect(result.ours).toContain('OURS CHANGE');
+    expect(result.theirs).toContain('THEIRS CHANGE');
+    expect(result.ours).toContain('identical lines truncated');
+    expect(result.ours.split('\n').length).toBeLessThan(oursLines.length);
+  });
+
+  it('should keep context lines around diff regions', () => {
+    const shared = Array.from({ length: 50 }, (_, i) => `shared-${i}`);
+    const oursLines = [...shared, 'DIFF-LINE', ...shared];
+    const theirsLines = [...shared, 'OTHER-LINE', ...shared];
+
+    const result = windowConflictSides(
+      oursLines.join('\n'),
+      theirsLines.join('\n'),
+      3,
+      50
+    );
+
+    // Lines adjacent to the diff should be preserved
+    expect(result.ours).toContain('shared-47');
+    expect(result.ours).toContain('shared-48');
+    expect(result.ours).toContain('shared-49');
+    expect(result.ours).toContain('DIFF-LINE');
+  });
+
+  it('should preserve all lines when everything differs', () => {
+    const ours = Array.from({ length: 10 }, (_, i) => `ours-${i}`).join('\n');
+    const theirs = Array.from({ length: 10 }, (_, i) => `theirs-${i}`).join('\n');
+
+    const result = windowConflictSides(ours, theirs, 3, 50);
+
+    // All lines differ, so nothing should be truncated
+    expect(result.ours).not.toContain('truncated');
+    expect(result.theirs).not.toContain('truncated');
   });
 });
