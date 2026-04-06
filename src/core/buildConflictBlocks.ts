@@ -181,10 +181,16 @@ async function fetchTicketContext(
  */
 export async function buildConflictBlocks(
   filePath: string,
-  provider: TicketProvider
+  provider: TicketProvider,
+  basePath?: string
 ): Promise<ConflictBlock[]> {
   const fileContent = fs.readFileSync(filePath, 'utf-8');
   const parsed = parseConflictMarkers(fileContent);
+
+  let baseLines: string[] | null = null;
+  if (basePath && basePath !== filePath && fs.existsSync(basePath)) {
+    baseLines = fs.readFileSync(basePath, 'utf-8').split('\n');
+  }
 
   if (parsed.length === 0) return [];
 
@@ -223,6 +229,13 @@ export async function buildConflictBlocks(
       fetchTicketContext(provider, theirsTicketId),
     ]);
 
+    let baseContent = '';
+    if (baseLines) {
+      const baseStart = Math.max(0, conflict.range.start - 1);
+      const baseEnd = Math.min(baseLines.length, conflict.range.end - 1);
+      baseContent = baseLines.slice(baseStart, baseEnd).join('\n');
+    }
+
     results.push({
       ours: {
         content: conflict.oursContent,
@@ -234,6 +247,7 @@ export async function buildConflictBlocks(
       },
       range: conflict.range,
       surroundingContext: conflict.surroundingContext,
+      baseContent,
     });
   }
 

@@ -59,7 +59,7 @@ async function run(): Promise<void> {
 
   for (const relPath of conflictingFiles) {
     const absPath = `${process.cwd()}/${relPath}`;
-    const blocks = await buildConflictBlocks(absPath, ticketProvider);
+    const blocks = await buildConflictBlocks(absPath, ticketProvider, '');
     let fileContent = fs.readFileSync(absPath, 'utf-8');
 
     const decisions: {

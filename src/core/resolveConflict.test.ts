@@ -1,5 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { buildPrompt, resolveConflict, buildBatchPrompt, resolveAllConflicts } from './resolveConflict.js';
+import {
+  buildPrompt,
+  resolveConflict,
+  buildBatchPrompt,
+  resolveAllConflicts,
+  validateResolution,
+  isWhitespaceOnlyDiff,
+  estimateTokens,
+  windowContent,
+} from './resolveConflict.js';
 import type { ConflictBlock } from './types.js';
 
 function makeBlock(overrides?: Partial<ConflictBlock>): ConflictBlock {
@@ -14,6 +23,7 @@ function makeBlock(overrides?: Partial<ConflictBlock>): ConflictBlock {
     },
     range: { start: 10, end: 15 },
     surroundingContext: 'function foo() {\n  // ...\n}',
+    baseContent: '',
     ...overrides,
   };
 }
@@ -118,6 +128,7 @@ describe('resolveConflict', () => {
   beforeEach(() => {
     vi.resetModules();
     vi.restoreAllMocks();
+    process.env.MERGE_CACHE_DISABLED = '1';
   });
 
   it('should return parsed resolution and explanation from Claude', async () => {
@@ -281,6 +292,7 @@ describe('resolveAllConflicts', () => {
   beforeEach(() => {
     vi.resetModules();
     vi.restoreAllMocks();
+    process.env.MERGE_CACHE_DISABLED = '1';
   });
 
   it('should return empty array for no blocks', async () => {
@@ -391,5 +403,120 @@ describe('resolveAllConflicts', () => {
 
     const { resolveAllConflicts: resolveAll } = await import('./resolveConflict.js');
     await expect(resolveAll([makeBlock(), makeBlock()])).rejects.toThrow('Failed to parse batch Claude response');
+  });
+});
+
+// --- Feature 1: Output Validation ---
+
+describe('validateResolution', () => {
+  it('should pass for clean resolution', () => {
+    expect(() => validateResolution('const x = 3;')).not.toThrow();
+  });
+
+  it('should throw for resolution with <<<<<<< markers', () => {
+    expect(() => validateResolution('<<<<<<< HEAD\nconst x = 1;')).toThrow('leftover conflict markers');
+  });
+
+  it('should throw for resolution with ======= markers', () => {
+    expect(() => validateResolution('const x = 1;\n=======\nconst x = 2;')).toThrow('leftover conflict markers');
+  });
+
+  it('should throw for resolution with >>>>>>> markers', () => {
+    expect(() => validateResolution('const x = 2;\n>>>>>>> branch')).toThrow('leftover conflict markers');
+  });
+
+  it('should include conflict index in error message when provided', () => {
+    expect(() => validateResolution('<<<<<<< HEAD', 2)).toThrow('Conflict 3 resolution');
+  });
+});
+
+// --- Feature 2: Base 3-Way Context ---
+
+describe('base 3-way context in prompts', () => {
+  it('should include base section in single prompt when baseContent is provided', () => {
+    const block = makeBlock({ baseContent: 'const x = 0;' });
+    const prompt = buildPrompt(block);
+
+    expect(prompt).toContain('Base version (common ancestor)');
+    expect(prompt).toContain('const x = 0;');
+    expect(prompt).toContain('Compare each side against the base');
+  });
+
+  it('should omit base section when baseContent is empty', () => {
+    const block = makeBlock({ baseContent: '' });
+    const prompt = buildPrompt(block);
+
+    expect(prompt).not.toContain('Base version');
+    expect(prompt).not.toContain('Compare each side against the base');
+  });
+
+  it('should include base section in batch prompt', () => {
+    const blocks = [
+      makeBlock({ baseContent: 'const original = true;' }),
+      makeBlock({ baseContent: '' }),
+    ];
+    const prompt = buildBatchPrompt(blocks);
+
+    expect(prompt).toContain('const original = true;');
+    expect(prompt).toContain('Compare each side against the base');
+  });
+});
+
+// --- Feature 4: Whitespace-Only Fast Path ---
+
+describe('isWhitespaceOnlyDiff', () => {
+  it('should return true for identical strings', () => {
+    expect(isWhitespaceOnlyDiff('const x = 1;', 'const x = 1;')).toBe(true);
+  });
+
+  it('should return true when only indentation differs', () => {
+    expect(isWhitespaceOnlyDiff('  const x = 1;', '    const x = 1;')).toBe(true);
+  });
+
+  it('should return true when trailing whitespace differs', () => {
+    expect(isWhitespaceOnlyDiff('const x = 1;  ', 'const x = 1;')).toBe(true);
+  });
+
+  it('should return true for tab vs space differences', () => {
+    expect(isWhitespaceOnlyDiff('\tconst x = 1;', '  const x = 1;')).toBe(true);
+  });
+
+  it('should return false for actual content differences', () => {
+    expect(isWhitespaceOnlyDiff('const x = 1;', 'const x = 2;')).toBe(false);
+  });
+
+  it('should return false for different line count with different content', () => {
+    expect(isWhitespaceOnlyDiff('line1\nline2', 'line1\nline3')).toBe(false);
+  });
+});
+
+// --- Feature 5: Token Windowing ---
+
+describe('token windowing', () => {
+  it('should return text unchanged when under threshold', () => {
+    const text = 'short text';
+    expect(windowContent(text, 1000)).toBe(text);
+  });
+
+  it('should truncate large text with marker', () => {
+    const lines = Array.from({ length: 200 }, (_, i) => `line ${i}: ${'x'.repeat(50)}`);
+    const text = lines.join('\n');
+    const result = windowContent(text, 500);
+
+    expect(result).toContain('truncated');
+    expect(result.length).toBeLessThan(text.length);
+  });
+
+  it('should preserve head and tail lines', () => {
+    const lines = Array.from({ length: 100 }, (_, i) => `line-${i}`);
+    const text = lines.join('\n');
+    const result = windowContent(text, 200);
+
+    expect(result).toContain('line-0');
+    expect(result).toContain('line-99');
+  });
+
+  it('estimateTokens should approximate text length / 4', () => {
+    expect(estimateTokens('a'.repeat(400))).toBe(100);
   });
 });

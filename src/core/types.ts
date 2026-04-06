@@ -13,6 +13,7 @@ export interface ConflictBlock {
   theirs: ConflictSide;
   range: { start: number; end: number };
   surroundingContext: string;
+  baseContent: string;
 }
 
 export interface ResolveResult {
