@@ -1,10 +1,8 @@
 import 'dotenv/config';
 import Anthropic from '@anthropic-ai/sdk';
 import type { ConflictBlock, ResolveResult } from './types.js';
-import { ResolutionCache } from './cache.js';
 
 let _anthropic: Anthropic | null = null;
-let _cache: ResolutionCache | null = null;
 
 function getAnthropicClient(): Anthropic {
   if (!_anthropic) {
@@ -18,17 +16,7 @@ function getAnthropicClient(): Anthropic {
   return _anthropic;
 }
 
-function getCache(): ResolutionCache | null {
-  if (process.env.MERGE_CACHE_DISABLED === '1') return null;
-  if (!_cache) {
-    const cacheDir = process.env.MERGE_CACHE_DIR || '.mergeagent-cache';
-    const ttl = Number(process.env.CACHE_TTL_HOURS) || 24;
-    _cache = new ResolutionCache(cacheDir, ttl, 500);
-  }
-  return _cache;
-}
-
-// --- Feature 1: Output Validation ---
+// --- Output Validation ---
 
 // Match actual Git conflict markers: <<<<<<< and >>>>>>> are always followed
 // by a space and branch/ref name.  ======= stands alone on its line.
@@ -44,7 +32,7 @@ export function validateResolution(resolution: string, index?: number): void {
   }
 }
 
-// --- Feature 4: Whitespace-Only Fast Path ---
+// --- Whitespace-Only Fast Path ---
 
 export function isWhitespaceOnlyDiff(a: string, b: string): boolean {
   const normalize = (s: string): string =>
@@ -52,7 +40,7 @@ export function isWhitespaceOnlyDiff(a: string, b: string): boolean {
   return normalize(a) === normalize(b);
 }
 
-// --- Feature 5: Token Windowing ---
+// --- Token Windowing ---
 
 export function estimateTokens(text: string): number {
   return Math.ceil(text.length / 4);
@@ -155,7 +143,7 @@ function applyWindowing(block: ConflictBlock): ConflictBlock {
   };
 }
 
-// --- Feature 2: Base 3-Way Context in Prompts ---
+// --- Base 3-Way Context in Prompts ---
 
 function buildBaseSection(baseContent: string): string {
   if (!baseContent) return '';
@@ -228,7 +216,6 @@ export function buildPrompt(block: ConflictBlock): string {
 export async function resolveConflict(
   block: ConflictBlock
 ): Promise<ResolveResult> {
-  // Feature 4: Whitespace fast path
   if (isWhitespaceOnlyDiff(block.ours.content, block.theirs.content)) {
     return {
       resolution: block.ours.content,
@@ -236,20 +223,7 @@ export async function resolveConflict(
     };
   }
 
-  // Apply windowing first — cache key must match what the prompt actually sends
-  const windowed = applyWindowing(block);
-
-  // Feature 3: Cache lookup (uses windowed content to match prompt)
-  const cache = getCache();
-  const cacheKey = cache?.computeKey(
-    windowed.baseContent, windowed.ours.content, windowed.theirs.content, windowed.surroundingContext
-  );
-  if (cache && cacheKey) {
-    const cached = cache.get(cacheKey);
-    if (cached) return cached;
-  }
-
-  const prompt = buildPromptFromWindowed(windowed);
+  const prompt = buildPrompt(block);
   const anthropic = getAnthropicClient();
 
   const message = await anthropic.messages.create({
@@ -273,13 +247,7 @@ export async function resolveConflict(
     );
   }
 
-  // Feature 1: Validate output
   validateResolution(result.resolution);
-
-  // Feature 3: Cache store
-  if (cache && cacheKey) {
-    cache.set(cacheKey, result);
-  }
 
   return result;
 }
@@ -353,7 +321,6 @@ export async function resolveAllConflicts(
   if (blocks.length === 0) return [];
   if (blocks.length === 1) return [await resolveConflict(blocks[0])];
 
-  const cache = getCache();
   const results: (ResolveResult | null)[] = new Array(blocks.length).fill(null);
   const uncachedBlocks: ConflictBlock[] = [];
   const uncachedIndexes: number[] = [];
@@ -361,7 +328,6 @@ export async function resolveAllConflicts(
   for (let i = 0; i < blocks.length; i++) {
     const block = blocks[i];
 
-    // Feature 4: Whitespace fast path
     if (isWhitespaceOnlyDiff(block.ours.content, block.theirs.content)) {
       results[i] = {
         resolution: block.ours.content,
@@ -370,35 +336,19 @@ export async function resolveAllConflicts(
       continue;
     }
 
-    // Feature 3: Cache lookup (use windowed content to match prompt)
-    if (cache) {
-      const windowed = applyWindowing(block);
-      const key = cache.computeKey(
-        windowed.baseContent, windowed.ours.content, windowed.theirs.content, windowed.surroundingContext
-      );
-      const cached = cache.get(key);
-      if (cached) {
-        results[i] = cached;
-        continue;
-      }
-    }
-
     uncachedBlocks.push(block);
     uncachedIndexes.push(i);
   }
 
-  // All resolved from cache/whitespace
   if (uncachedBlocks.length === 0) {
     return results as ResolveResult[];
   }
 
-  // Single uncached block — delegate to resolveConflict (handles its own caching)
   if (uncachedBlocks.length === 1) {
     results[uncachedIndexes[0]] = await resolveConflict(uncachedBlocks[0]);
     return results as ResolveResult[];
   }
 
-  // Batch resolve uncached blocks
   const prompt = buildBatchPrompt(uncachedBlocks);
   const anthropic = getAnthropicClient();
 
@@ -433,24 +383,12 @@ export async function resolveAllConflicts(
       );
     }
 
-    // Feature 1: Validate output
     validateResolution(item.resolution, uncachedIndexes[j]);
 
-    const result: ResolveResult = {
+    results[uncachedIndexes[j]] = {
       resolution: item.resolution,
       explanation: item.explanation,
     };
-
-    results[uncachedIndexes[j]] = result;
-
-    // Feature 3: Cache store (windowed content to match key)
-    if (cache) {
-      const windowed = applyWindowing(uncachedBlocks[j]);
-      const key = cache.computeKey(
-        windowed.baseContent, windowed.ours.content, windowed.theirs.content, windowed.surroundingContext
-      );
-      cache.set(key, result);
-    }
   }
 
   return results as ResolveResult[];

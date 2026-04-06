@@ -129,7 +129,6 @@ describe('resolveConflict', () => {
   beforeEach(() => {
     vi.resetModules();
     vi.restoreAllMocks();
-    process.env.MERGE_CACHE_DISABLED = '1';
   });
 
   it('should return parsed resolution and explanation from Claude', async () => {
@@ -293,7 +292,6 @@ describe('resolveAllConflicts', () => {
   beforeEach(() => {
     vi.resetModules();
     vi.restoreAllMocks();
-    process.env.MERGE_CACHE_DISABLED = '1';
   });
 
   it('should return empty array for no blocks', async () => {
