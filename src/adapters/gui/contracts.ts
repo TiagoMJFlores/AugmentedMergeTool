@@ -9,12 +9,15 @@ export interface GuiConflictBlock {
   id: string;
   index: number;
   range: { start: number; end: number };
+  localRange: { start: number; end: number };
+  remoteRange: { start: number; end: number };
   ours: string;
   theirs: string;
   aiResult: string;
   explanation: string;
   appliedResolution: string | null;
   actionTaken: boolean;
+  selectedSide: 'local' | 'remote' | 'both' | null;
 }
 
 export interface GuiSessionState {

@@ -53,6 +53,11 @@ main {
   background: rgba(59, 130, 246, 0.2);
 }
 
+.active-line {
+  background: rgba(239, 68, 68, 0.22);
+  border-left: 2px solid #ef4444;
+}
+
 .middle-controls {
   display: flex;
   flex-direction: column;

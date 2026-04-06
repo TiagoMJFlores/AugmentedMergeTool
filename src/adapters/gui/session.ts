@@ -25,12 +25,17 @@ interface SessionData {
 interface SideViews {
   localContent: string;
   remoteContent: string;
+  ranges: Array<{
+    localRange: { start: number; end: number };
+    remoteRange: { start: number; end: number };
+  }>;
 }
 
 function buildSideViews(mergedContent: string): SideViews {
   const lines = mergedContent.split('\n');
   const localOutput: string[] = [];
   const remoteOutput: string[] = [];
+  const ranges: SideViews['ranges'] = [];
 
   let i = 0;
   while (i < lines.length) {
@@ -76,14 +81,27 @@ function buildSideViews(mergedContent: string): SideViews {
       i++;
     }
 
+    const localStart = localOutput.length + 1;
+    const remoteStart = remoteOutput.length + 1;
     localOutput.push(...localLines);
     remoteOutput.push(...remoteLines);
+    ranges.push({
+      localRange: {
+        start: localStart,
+        end: Math.max(localStart, localOutput.length),
+      },
+      remoteRange: {
+        start: remoteStart,
+        end: Math.max(remoteStart, remoteOutput.length),
+      },
+    });
     i++;
   }
 
   return {
     localContent: localOutput.join('\n'),
     remoteContent: remoteOutput.join('\n'),
+    ranges,
   };
 }
 
@@ -101,12 +119,15 @@ export class GuiSession {
       id: `conflict-${index + 1}`,
       index,
       range: block.range,
+      localRange: sideViews.ranges[index]?.localRange ?? { start: 1, end: 1 },
+      remoteRange: sideViews.ranges[index]?.remoteRange ?? { start: 1, end: 1 },
       ours: block.ours.content,
       theirs: block.theirs.content,
       aiResult: '',
       explanation: '',
       appliedResolution: null,
       actionTaken: false,
+      selectedSide: null,
     }));
 
     return new GuiSession({
@@ -142,14 +163,19 @@ export class GuiSession {
 
     if (input.mode === 'skip') {
       target.appliedResolution = null;
+      target.selectedSide = null;
     } else if (input.mode === 'use-local') {
       target.appliedResolution = target.ours;
+      target.selectedSide = 'local';
     } else if (input.mode === 'use-remote') {
       target.appliedResolution = target.theirs;
+      target.selectedSide = 'remote';
     } else if (input.mode === 'accept-both') {
       target.appliedResolution = [target.ours, target.theirs].filter(Boolean).join('\n');
+      target.selectedSide = 'both';
     } else {
       target.appliedResolution = input.editedResolution ?? target.aiResult;
+      target.selectedSide = null;
     }
     target.actionTaken = true;
 

@@ -44,8 +44,11 @@ describe('GuiSession.create', () => {
     expect(state.total).toBe(1);
     expect(state.blocks[0]?.ours).toBe('ours line');
     expect(state.blocks[0]?.theirs).toBe('theirs line');
+    expect(state.blocks[0]?.selectedSide).toBeNull();
     expect(state.localFullContent).toBe(['before', 'ours line', 'after'].join('\n'));
     expect(state.remoteFullContent).toBe(['before', 'theirs line', 'after'].join('\n'));
+    expect(state.blocks[0]?.localRange).toEqual({ start: 2, end: 2 });
+    expect(state.blocks[0]?.remoteRange).toEqual({ start: 2, end: 2 });
   });
 
   it('accept-both mode keeps local then remote content', async () => {
@@ -76,5 +79,6 @@ describe('GuiSession.create', () => {
     const state = session.applyResolution({ conflictIndex: 0, mode: 'accept-both' });
 
     expect(state.blocks[0]?.appliedResolution).toBe(['local line', 'remote line'].join('\n'));
+    expect(state.blocks[0]?.selectedSide).toBe('both');
   });
 });

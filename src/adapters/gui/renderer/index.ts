@@ -4,12 +4,15 @@ type MonacoEditor = {
 };
 
 interface GuiConflictBlock {
+  localRange: { start: number; end: number };
+  remoteRange: { start: number; end: number };
   ours: string;
   theirs: string;
   aiResult: string;
   explanation: string;
   appliedResolution: string | null;
   actionTaken: boolean;
+  selectedSide: 'local' | 'remote' | 'both' | null;
 }
 
 interface GuiSessionState {
@@ -25,9 +28,7 @@ interface GuiSessionState {
 const progress = document.getElementById('progress');
 const localPane = document.getElementById('local-content');
 const remotePane = document.getElementById('remote-content');
-const switchDirectionButton = document.getElementById('switch-direction-btn') as HTMLButtonElement | null;
-const applyDirectionButton = document.getElementById('apply-direction-btn') as HTMLButtonElement | null;
-const acceptBothButton = document.getElementById('accept-both-btn') as HTMLButtonElement | null;
+const selectionArrowButton = document.getElementById('selection-arrow-btn') as HTMLButtonElement | null;
 const explanation = document.getElementById('explanation');
 const status = document.getElementById('status');
 const prevButton = document.getElementById('prev-btn') as HTMLButtonElement | null;
@@ -45,9 +46,13 @@ const editorRoot = editorContainer;
 
 let editor: MonacoEditor;
 let state: GuiSessionState | null = null;
-let direction: 'left-to-right' | 'right-to-left' = 'left-to-right';
 
-function renderCodePane(container: HTMLElement | null, content: string, oppositeContent: string): void {
+function renderCodePane(
+  container: HTMLElement | null,
+  content: string,
+  oppositeContent: string,
+  activeRange: { start: number; end: number }
+): void {
   if (!container) return;
 
   const lines = content.split('\n');
@@ -55,10 +60,15 @@ function renderCodePane(container: HTMLElement | null, content: string, opposite
   const fragment = document.createDocumentFragment();
 
   for (let index = 0; index < lines.length; index++) {
+    const lineNumber = index + 1;
     const lineElement = document.createElement('div');
     lineElement.className = 'code-line';
+    lineElement.dataset.line = String(lineNumber);
     if ((oppositeLines[index] ?? '') !== (lines[index] ?? '')) {
       lineElement.classList.add('diff-line');
+    }
+    if (lineNumber >= activeRange.start && lineNumber <= activeRange.end) {
+      lineElement.classList.add('active-line');
     }
     lineElement.textContent = lines[index] ?? '';
     fragment.appendChild(lineElement);
@@ -67,15 +77,28 @@ function renderCodePane(container: HTMLElement | null, content: string, opposite
   container.replaceChildren(fragment);
 }
 
-function updateDirectionControls(): void {
-  if (switchDirectionButton) {
-    switchDirectionButton.textContent =
-      direction === 'left-to-right' ? '➡️ Left → Right' : '⬅️ Right → Left';
+function updateSelectionArrow(nextState: GuiSessionState): void {
+  if (!selectionArrowButton) return;
+  const block = nextState.blocks[nextState.currentIndex];
+  if (!block || block.selectedSide === null || block.selectedSide === 'local') {
+    selectionArrowButton.textContent = '➡️';
+    selectionArrowButton.title = 'Selecionar lado esquerdo (LOCAL)';
+    return;
   }
-  if (applyDirectionButton) {
-    applyDirectionButton.textContent =
-      direction === 'left-to-right' ? 'Apply Left Side' : 'Apply Right Side';
+  if (block.selectedSide === 'remote') {
+    selectionArrowButton.textContent = '⬅️';
+    selectionArrowButton.title = 'Selecionar lado direito (REMOTE)';
+    return;
   }
+  selectionArrowButton.textContent = '↔️';
+  selectionArrowButton.title = 'Selecionar ambos os lados';
+}
+
+function scrollActiveLineToCenter(container: HTMLElement | null): void {
+  if (!container) return;
+  const activeLine = container.querySelector('.active-line');
+  if (!activeLine) return;
+  activeLine.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
 function createFallbackEditor(): MonacoEditor {
@@ -114,8 +137,8 @@ function render(nextState: GuiSessionState): void {
       status.textContent = `No conflict markers found in MERGED file: ${nextState.mergedPath}`;
     }
     if (progress) progress.textContent = `0 / 0 • ${mergedPathLabel}`;
-    renderCodePane(localPane, '', '');
-    renderCodePane(remotePane, '', '');
+    renderCodePane(localPane, '', '', { start: 0, end: 0 });
+    renderCodePane(remotePane, '', '', { start: 0, end: 0 });
     if (explanation) explanation.textContent = 'Open a file that still contains Git conflict markers.';
     editor.setValue('');
     return;
@@ -126,8 +149,8 @@ function render(nextState: GuiSessionState): void {
     progress.textContent = `Conflict ${nextState.currentIndex + 1} of ${nextState.total} • ${mergedPathLabel}`;
   }
 
-  renderCodePane(localPane, nextState.localFullContent, nextState.remoteFullContent);
-  renderCodePane(remotePane, nextState.remoteFullContent, nextState.localFullContent);
+  renderCodePane(localPane, nextState.localFullContent, nextState.remoteFullContent, block.localRange);
+  renderCodePane(remotePane, nextState.remoteFullContent, nextState.localFullContent, block.remoteRange);
   if (explanation) explanation.textContent = block.explanation || 'Generate AI to view explanation.';
 
   editor.setValue(block.appliedResolution ?? block.aiResult);
@@ -139,7 +162,9 @@ function render(nextState: GuiSessionState): void {
   if (prevButton) prevButton.disabled = nextState.currentIndex === 0;
   if (nextButton) nextButton.disabled = nextState.currentIndex === nextState.total - 1;
   if (finishButton) finishButton.disabled = !nextState.complete;
-  updateDirectionControls();
+  updateSelectionArrow(nextState);
+  scrollActiveLineToCenter(localPane);
+  scrollActiveLineToCenter(remotePane);
 }
 
 async function refresh(): Promise<void> {
@@ -178,24 +203,24 @@ function wireActions(): void {
     render(await window.mergeGuiApi.applyResolution({ conflictIndex: current.currentIndex, mode: 'skip' }));
   });
 
-  switchDirectionButton?.addEventListener('click', () => {
-    direction = direction === 'left-to-right' ? 'right-to-left' : 'left-to-right';
-    updateDirectionControls();
-  });
-
-  applyDirectionButton?.addEventListener('click', async () => {
+  selectionArrowButton?.addEventListener('click', async () => {
     const current = assertState();
+    const block = current.blocks[current.currentIndex];
+    const currentSelection = block?.selectedSide;
+    const nextMode =
+      currentSelection === null
+        ? 'use-local'
+        : currentSelection === 'local'
+        ? 'use-remote'
+        : currentSelection === 'remote'
+          ? 'accept-both'
+          : 'use-local';
     render(
       await window.mergeGuiApi.applyResolution({
         conflictIndex: current.currentIndex,
-        mode: direction === 'left-to-right' ? 'use-local' : 'use-remote',
+        mode: nextMode,
       })
     );
-  });
-
-  acceptBothButton?.addEventListener('click', async () => {
-    const current = assertState();
-    render(await window.mergeGuiApi.applyResolution({ conflictIndex: current.currentIndex, mode: 'accept-both' }));
   });
 
   finishButton?.addEventListener('click', async () => {
