@@ -47,6 +47,7 @@ const applyButton = document.getElementById('apply-btn') as HTMLButtonElement | 
 const skipButton = document.getElementById('skip-btn') as HTMLButtonElement | null;
 const finishButton = document.getElementById('finish-btn') as HTMLButtonElement | null;
 const resultEditor = document.getElementById('result-editor') as HTMLTextAreaElement | null;
+const resultHighlight = document.getElementById('result-highlight');
 
 if (!resultEditor) {
   throw new Error('result editor not found');
@@ -105,33 +106,48 @@ function renderCodePane(
   container.replaceChildren(fragment);
 }
 
+function renderResultHighlight(
+  highlight: HTMLElement | null,
+  content: string,
+  activeConflictIndex: number,
+  lineOwners: number[]
+): void {
+  if (!highlight) return;
+
+  const lines = content.split('\n');
+  const fragment = document.createDocumentFragment();
+
+  for (let index = 0; index < lines.length; index++) {
+    const lineElement = document.createElement('div');
+    lineElement.className = 'code-line';
+    lineElement.dataset.line = String(index + 1);
+
+    const owner = lineOwners[index] ?? -1;
+    if (owner >= 0) {
+      if (owner === activeConflictIndex) {
+        lineElement.classList.add('active-line');
+      } else {
+        lineElement.classList.add('conflict-line');
+      }
+    }
+
+    lineElement.textContent = lines[index] ?? '';
+    fragment.appendChild(lineElement);
+  }
+
+  highlight.replaceChildren(fragment);
+}
+
 function renderResultPane(
   editor: HTMLTextAreaElement | null,
   content: string,
   activeConflictIndex: number,
   lineOwners: number[],
-  fallbackRange: { start: number; end: number }
+  _fallbackRange: { start: number; end: number }
 ): void {
   if (!editor) return;
-  const lines = content.split('\n');
-  const highlightRange = computeHighlightRange(lines.length, activeConflictIndex, lineOwners, fallbackRange);
-  const clampedStart = highlightRange.start;
-  const clampedEnd = highlightRange.end;
-  const computed = getComputedStyle(editor);
-  const lineHeight = Number.parseFloat(computed.lineHeight) || 22;
-  const topPadding = Number.parseFloat(computed.paddingTop) || 8;
-  const startPx = topPadding + (clampedStart - 1) * lineHeight;
-  const endPx = topPadding + clampedEnd * lineHeight;
 
-  editor.style.background = `linear-gradient(
-      to bottom,
-      #0b1220 0px,
-      #0b1220 ${startPx}px,
-      rgba(239, 68, 68, 0.45) ${startPx}px,
-      rgba(239, 68, 68, 0.45) ${endPx}px,
-      #0b1220 ${endPx}px
-    )`;
-  editor.style.backgroundAttachment = 'local';
+  renderResultHighlight(resultHighlight, content, activeConflictIndex, lineOwners);
 
   if (!hasManualResultEdits) {
     editor.value = content;
@@ -271,6 +287,17 @@ function render(nextState: GuiSessionState): void {
   scrollActiveLineToCenter(remotePane);
   if (centerResultOnNextRender) {
     centerResultOnNextRender = false;
+    if (resultHighlight && resultEditor) {
+      const activeLine = resultHighlight.querySelector('.active-line');
+      if (activeLine instanceof HTMLElement) {
+        const targetTop = Math.max(
+          0,
+          activeLine.offsetTop - resultHighlight.clientHeight / 2 + activeLine.clientHeight / 2
+        );
+        resultHighlight.scrollTop = targetTop;
+        resultEditor.scrollTop = targetTop;
+      }
+    }
   }
   if (localPane) {
     queueMicrotask(() => syncPaneScroll(localPane));
@@ -343,6 +370,13 @@ function wireActions(): void {
   remotePane?.addEventListener('scroll', () => syncPaneScroll(remotePane));
   finishButton?.addEventListener('click', async () => {
     await window.mergeGuiApi.finish(resultEditor?.value);
+  });
+
+  resultEditor?.addEventListener('scroll', () => {
+    if (resultHighlight) {
+      resultHighlight.scrollTop = resultEditor.scrollTop;
+      resultHighlight.scrollLeft = resultEditor.scrollLeft;
+    }
   });
 
   resultEditor?.addEventListener('input', () => {
