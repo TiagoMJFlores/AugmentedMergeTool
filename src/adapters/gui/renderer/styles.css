@@ -107,9 +107,19 @@ main {
 }
 
 .code-line {
-  padding: 4px 6px;
+  padding: 2px 6px;
   min-width: max-content;
-  line-height: 1.5;
+  line-height: 1.6;
+}
+
+/* Inside the result-highlight overlay, code-line divs must have ZERO vertical
+   padding and inherit the parent's line-height so they stay pixel-aligned with
+   the textarea lines underneath.  Any mismatch accumulates across lines and
+   causes visible overlap / garbled text. */
+.result-highlight .code-line {
+  padding-top: 0;
+  padding-bottom: 0;
+  line-height: inherit;
 }
 
 .diff-line {
