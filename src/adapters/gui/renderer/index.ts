@@ -13,6 +13,7 @@ interface GuiConflictBlock {
   actionTaken: boolean;
   selectedSide: 'local' | 'remote' | 'both' | null;
   selectedAction:
+    | 'choose-ai'
     | 'choose-left'
     | 'choose-right'
     | 'choose-both-left-first'
@@ -360,13 +361,15 @@ function wireActions(): void {
     centerResultOnNextRender = true;
     const action = actionsSelect.value;
     const mode =
-      action === 'choose-right'
-        ? 'use-remote'
-        : action === 'choose-both-left-first'
-          ? 'accept-both'
-          : action === 'choose-both-right-first'
-            ? 'accept-both-right-first'
-            : 'use-local';
+      action === 'choose-ai'
+        ? 'apply-ai'
+        : action === 'choose-right'
+          ? 'use-remote'
+          : action === 'choose-both-left-first'
+            ? 'accept-both'
+            : action === 'choose-both-right-first'
+              ? 'accept-both-right-first'
+              : 'use-local';
     render(await window.mergeGuiApi.applyResolution({ conflictIndex: current.currentIndex, mode }));
   });
 
@@ -399,18 +402,24 @@ async function init(): Promise<void> {
   await refresh();
 
   const current = assertState();
-  const currentBlock = current.blocks[current.currentIndex];
-  if (current.total > 0 && currentBlock && !currentBlock.aiResult) {
+  if (current.total === 0) return;
+
+  const hasPending = current.blocks.some((block) => !block.aiResult);
+  if (!hasPending) return;
+
+  if (status) {
+    status.textContent = `Generating AI suggestions for ${current.total} conflict(s)...`;
+  }
+
+  try {
+    render(await window.mergeGuiApi.generateAllAiResolutions());
     if (status) {
-      status.textContent = 'Generating initial AI suggestion...';
+      status.textContent = 'All AI suggestions ready.';
     }
-    try {
-      render(await window.mergeGuiApi.generateAiResolution({ conflictIndex: current.currentIndex }));
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      if (status) {
-        status.textContent = `Could not generate initial AI suggestion: ${message}`;
-      }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (status) {
+      status.textContent = `Could not generate AI suggestions: ${message}`;
     }
   }
 }

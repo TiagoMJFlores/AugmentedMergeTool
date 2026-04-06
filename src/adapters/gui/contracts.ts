@@ -20,6 +20,7 @@ export interface GuiConflictBlock {
   actionTaken: boolean;
   selectedSide: 'local' | 'remote' | 'both' | null;
   selectedAction:
+    | 'choose-ai'
     | 'choose-left'
     | 'choose-right'
     | 'choose-both-left-first'
@@ -59,6 +60,7 @@ export interface ApplyResolutionInput {
 export interface RendererApi {
   getState: () => Promise<GuiSessionState>;
   generateAiResolution: (input: ResolveAndStoreInput) => Promise<GuiSessionState>;
+  generateAllAiResolutions: () => Promise<GuiSessionState>;
   applyResolution: (input: ApplyResolutionInput) => Promise<GuiSessionState>;
   navigateTo: (index: number) => Promise<GuiSessionState>;
   finish: (finalContent?: string) => Promise<void>;

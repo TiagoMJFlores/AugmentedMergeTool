@@ -51,6 +51,13 @@ ipcMain.handle('gui:resolve', async (_event, input: ResolveAndStoreInput) => {
   return session.generateAiResolution(input);
 });
 
+ipcMain.handle('gui:resolve-all', async () => {
+  if (!session) {
+    throw new Error('Session not initialized');
+  }
+  return session.generateAllAiResolutions();
+});
+
 ipcMain.handle('gui:apply', async (_event, input: ApplyResolutionInput) => {
   if (!session) {
     throw new Error('Session not initialized');
