@@ -107,8 +107,9 @@ main {
 }
 
 .code-line {
-  padding: 1px 6px;
+  padding: 4px 6px;
   min-width: max-content;
+  line-height: 1.5;
 }
 
 .diff-line {
