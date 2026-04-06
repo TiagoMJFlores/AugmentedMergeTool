@@ -70,10 +70,11 @@ export function windowContent(text: string, maxTokens: number): string {
 
 function applyWindowing(block: ConflictBlock): ConflictBlock {
   const maxTokens = Number(process.env.MAX_CONFLICT_TOKENS) || 3000;
+  // Only window surrounding context and base — never truncate the actual
+  // conflict content (ours/theirs) since those are the lines the LLM must
+  // resolve and any truncation would lose essential information.
   return {
     ...block,
-    ours: { ...block.ours, content: windowContent(block.ours.content, maxTokens) },
-    theirs: { ...block.theirs, content: windowContent(block.theirs.content, maxTokens) },
     surroundingContext: windowContent(block.surroundingContext, maxTokens),
     baseContent: windowContent(block.baseContent, maxTokens),
   };
