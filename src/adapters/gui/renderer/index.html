@@ -12,18 +12,26 @@
   </head>
   <body>
     <header>
-      <h1>AI-assisted Merge Resolver</h1>
       <div id="progress"></div>
     </header>
 
     <main>
+      <section class="top-actions controls">
+        <button id="prev-btn">⬆️ Previous conflict</button>
+        <button id="next-btn">⬇️ Next conflict</button>
+        <button id="resolve-btn">Regenerate AI</button>
+        <button id="apply-btn">Apply AI Result</button>
+        <button id="skip-btn">Skip</button>
+        <button id="finish-btn">Write MERGED & Exit</button>
+      </section>
+
       <section class="top-grid">
         <article>
           <h2>LOCAL (HEAD)</h2>
           <div id="local-content" class="code-pane" aria-label="Local file content"></div>
         </article>
         <article class="middle-controls">
-          <button id="selection-arrow-btn" class="direction-btn">➡️</button>
+          <div id="conflict-gutter" class="conflict-gutter" aria-label="Conflict selectors"></div>
         </article>
         <article>
           <h2>REMOTE (incoming)</h2>
@@ -32,18 +40,19 @@
       </section>
 
       <section class="result">
-        <h2>AI RESULT (Editable)</h2>
-        <div id="editor"></div>
         <p id="explanation"></p>
+        <textarea id="result-editor" class="result-editor" aria-label="Editable final merged content"></textarea>
       </section>
 
-      <section class="controls">
-        <button id="prev-btn">Previous</button>
-        <button id="next-btn">Next</button>
-        <button id="resolve-btn">Regenerate AI</button>
-        <button id="apply-btn">Apply</button>
-        <button id="skip-btn">Skip</button>
-        <button id="finish-btn">Write MERGED & Exit</button>
+      <section class="actions-panel">
+        <label for="actions-select">Actions</label>
+        <select id="actions-select">
+          <option value="choose-left">Choose left</option>
+          <option value="choose-right">Choose right</option>
+          <option value="choose-both-left-first">Choose both (left first)</option>
+          <option value="choose-both-right-first">Choose both (right first)</option>
+          <option value="choose-neither">Choose neither</option>
+        </select>
       </section>
 
       <p id="status"></p>
