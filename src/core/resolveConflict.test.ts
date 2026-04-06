@@ -9,6 +9,7 @@ import {
   estimateTokens,
   windowContent,
   windowConflictSides,
+  tryTrivialResolve,
 } from './resolveConflict.js';
 import type { ConflictBlock } from './types.js';
 
@@ -493,8 +494,8 @@ describe('isWhitespaceOnlyDiff', () => {
     expect(isWhitespaceOnlyDiff('line1\nline2', 'line1\nline3')).toBe(false);
   });
 
-  it('should return false when blank lines are added or removed', () => {
-    expect(isWhitespaceOnlyDiff('line1\n\nline2', 'line1\nline2')).toBe(false);
+  it('should return true when blank lines are added or removed', () => {
+    expect(isWhitespaceOnlyDiff('line1\n\nline2', 'line1\nline2')).toBe(true);
   });
 });
 
@@ -581,5 +582,51 @@ describe('windowConflictSides', () => {
     // All lines differ, so nothing should be truncated
     expect(result.ours).not.toContain('truncated');
     expect(result.theirs).not.toContain('truncated');
+  });
+});
+
+describe('tryTrivialResolve', () => {
+  it('should resolve identical sides without LLM', () => {
+    const result = tryTrivialResolve(makeBlock({ ours: { content: 'same', ticket: null }, theirs: { content: 'same', ticket: null } }));
+    expect(result).not.toBeNull();
+    expect(result!.resolution).toBe('same');
+    expect(result!.explanation).toContain('identical');
+  });
+
+  it('should resolve whitespace-only diff without LLM', () => {
+    const result = tryTrivialResolve(makeBlock({ ours: { content: '  code', ticket: null }, theirs: { content: 'code', ticket: null } }));
+    expect(result).not.toBeNull();
+    expect(result!.explanation).toContain('Whitespace');
+  });
+
+  it('should resolve empty ours — keep theirs', () => {
+    const result = tryTrivialResolve(makeBlock({ ours: { content: '', ticket: null }, theirs: { content: 'real code', ticket: null } }));
+    expect(result).not.toBeNull();
+    expect(result!.resolution).toBe('real code');
+    expect(result!.explanation).toContain('kept theirs');
+  });
+
+  it('should resolve empty theirs — keep ours', () => {
+    const result = tryTrivialResolve(makeBlock({ ours: { content: 'real code', ticket: null }, theirs: { content: '', ticket: null } }));
+    expect(result).not.toBeNull();
+    expect(result!.resolution).toBe('real code');
+    expect(result!.explanation).toContain('kept ours');
+  });
+
+  it('should resolve both empty', () => {
+    const result = tryTrivialResolve(makeBlock({ ours: { content: '', ticket: null }, theirs: { content: '', ticket: null } }));
+    expect(result).not.toBeNull();
+    expect(result!.resolution).toBe('');
+  });
+
+  it('should resolve trailing newline difference only', () => {
+    const result = tryTrivialResolve(makeBlock({ ours: { content: 'code\n', ticket: null }, theirs: { content: 'code', ticket: null } }));
+    expect(result).not.toBeNull();
+    expect(result!.explanation).toContain('Trailing newline');
+  });
+
+  it('should return null for real conflicts', () => {
+    const result = tryTrivialResolve(makeBlock());
+    expect(result).toBeNull();
   });
 });

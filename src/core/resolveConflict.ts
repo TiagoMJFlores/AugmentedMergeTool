@@ -36,7 +36,7 @@ export function validateResolution(resolution: string, index?: number): void {
 
 export function isWhitespaceOnlyDiff(a: string, b: string): boolean {
   const normalize = (s: string): string =>
-    s.split('\n').map((line) => line.replace(/\s+/g, ' ').trim()).join('\n');
+    s.split('\n').map((line) => line.replace(/\s+/g, ' ').trim()).filter(Boolean).join('\n');
   return normalize(a) === normalize(b);
 }
 
@@ -213,15 +213,48 @@ export function buildPrompt(block: ConflictBlock): string {
   return buildPromptFromWindowed(applyWindowing(block));
 }
 
+/**
+ * Check if a conflict can be resolved trivially without calling the LLM.
+ * Returns a ResolveResult if trivial, or null if the LLM is needed.
+ */
+export function tryTrivialResolve(block: ConflictBlock): ResolveResult | null {
+  const ours = block.ours.content;
+  const theirs = block.theirs.content;
+
+  // Identical sides — no real conflict
+  if (ours === theirs) {
+    return { resolution: ours, explanation: 'Both sides are identical — no conflict.' };
+  }
+
+  // One side is empty — keep the side that has content
+  if (ours.trim() === '' && theirs.trim() !== '') {
+    return { resolution: theirs, explanation: 'Our side is empty — kept theirs.' };
+  }
+  if (theirs.trim() === '' && ours.trim() !== '') {
+    return { resolution: ours, explanation: 'Their side is empty — kept ours.' };
+  }
+  if (ours.trim() === '' && theirs.trim() === '') {
+    return { resolution: '', explanation: 'Both sides are empty.' };
+  }
+
+  // Trailing newline difference only
+  if (ours.replace(/\n+$/, '') === theirs.replace(/\n+$/, '')) {
+    return { resolution: ours, explanation: 'Trailing newline difference only — kept ours version.' };
+  }
+
+  // Whitespace-only difference (indentation, spaces, blank lines)
+  if (isWhitespaceOnlyDiff(ours, theirs)) {
+    return { resolution: ours, explanation: 'Whitespace-only difference — kept ours version.' };
+  }
+
+  return null;
+}
+
 export async function resolveConflict(
   block: ConflictBlock
 ): Promise<ResolveResult> {
-  if (isWhitespaceOnlyDiff(block.ours.content, block.theirs.content)) {
-    return {
-      resolution: block.ours.content,
-      explanation: 'Whitespace-only difference — kept ours version.',
-    };
-  }
+  const trivial = tryTrivialResolve(block);
+  if (trivial) return trivial;
 
   const prompt = buildPrompt(block);
   const anthropic = getAnthropicClient();
@@ -326,17 +359,13 @@ export async function resolveAllConflicts(
   const uncachedIndexes: number[] = [];
 
   for (let i = 0; i < blocks.length; i++) {
-    const block = blocks[i];
-
-    if (isWhitespaceOnlyDiff(block.ours.content, block.theirs.content)) {
-      results[i] = {
-        resolution: block.ours.content,
-        explanation: 'Whitespace-only difference — kept ours version.',
-      };
+    const trivial = tryTrivialResolve(blocks[i]);
+    if (trivial) {
+      results[i] = trivial;
       continue;
     }
 
-    uncachedBlocks.push(block);
+    uncachedBlocks.push(blocks[i]);
     uncachedIndexes.push(i);
   }
 
