@@ -223,12 +223,16 @@ function syncPaneScroll(source: HTMLElement): void {
   syncingScroll = false;
 }
 
-function scrollActiveLineToCenter(container: HTMLElement | null): void {
+function scrollActiveLineToCenter(container: HTMLElement | null, instant = false): void {
   if (!container) return;
   const activeLine = container.querySelector('.active-line');
   if (!(activeLine instanceof HTMLElement)) return;
   const targetTop = Math.max(0, activeLine.offsetTop - container.clientHeight / 2 + activeLine.clientHeight / 2);
-  container.scrollTo({ top: targetTop, behavior: 'smooth' });
+  if (instant) {
+    container.scrollTop = targetTop;
+  } else {
+    container.scrollTo({ top: targetTop, behavior: 'smooth' });
+  }
 }
 
 function assertState(): GuiSessionState {
@@ -296,9 +300,12 @@ function render(nextState: GuiSessionState): void {
   if (nextButton) nextButton.disabled = nextState.total === 0;
   if (finishButton) finishButton.disabled = !nextState.complete;
   renderConflictArrows(nextState);
-  scrollActiveLineToCenter(localPane);
-  scrollActiveLineToCenter(remotePane);
-  if (centerResultOnNextRender) {
+
+  const navigating = centerResultOnNextRender;
+  scrollActiveLineToCenter(localPane, navigating);
+  scrollActiveLineToCenter(remotePane, navigating);
+
+  if (navigating) {
     centerResultOnNextRender = false;
     if (resultHighlight && resultEditor) {
       const activeLine = resultHighlight.querySelector('.active-line');
@@ -311,8 +318,11 @@ function render(nextState: GuiSessionState): void {
         resultEditor.scrollTop = targetTop;
       }
     }
-  }
-  if (localPane) {
+    // Sync gutter after all panes have scrolled instantly
+    if (conflictGutter && localPane) {
+      conflictGutter.scrollTop = localPane.scrollTop;
+    }
+  } else if (localPane) {
     queueMicrotask(() => syncPaneScroll(localPane));
   }
 }
