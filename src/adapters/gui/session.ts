@@ -60,6 +60,8 @@ export class GuiSession {
     const target = this.data.blocks[input.conflictIndex];
     target.aiResult = result.resolution;
     target.explanation = result.explanation;
+    target.appliedResolution = result.resolution;
+    target.actionTaken = true;
 
     return this.getState();
   }
@@ -70,9 +72,7 @@ export class GuiSession {
       throw new Error(`Invalid conflict index: ${input.conflictIndex}`);
     }
 
-    if (input.mode === 'skip') {
-      target.appliedResolution = null;
-    } else if (input.mode === 'use-local') {
+    if (input.mode === 'use-local') {
       target.appliedResolution = target.ours;
     } else if (input.mode === 'use-remote') {
       target.appliedResolution = target.theirs;

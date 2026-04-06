@@ -25,7 +25,7 @@ export interface GuiSessionState {
   blocks: GuiConflictBlock[];
 }
 
-export type ResolutionMode = 'apply-ai' | 'skip' | 'use-local' | 'use-remote';
+export type ResolutionMode = 'apply-ai' | 'use-local' | 'use-remote';
 
 export interface ResolveAndStoreInput {
   conflictIndex: number;

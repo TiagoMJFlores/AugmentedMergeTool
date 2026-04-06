@@ -19,6 +19,31 @@ main {
   gap: 16px;
 }
 
+/* ---------- Conflict navigation bar ---------- */
+
+.conflict-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+}
+
+#conflict-indicator {
+  display: inline-block;
+  min-width: 72px;
+  text-align: center;
+  font-weight: 600;
+  font-size: 14px;
+  letter-spacing: 0.5px;
+  color: #e2e8f0;
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 20px;
+  padding: 6px 18px;
+}
+
+/* ---------- Code panes ---------- */
+
 .top-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -31,12 +56,57 @@ textarea {
   background: #0b1220;
   border: 1px solid #374151;
   color: #e5e7eb;
+  font-family: 'Menlo', 'Consolas', monospace;
+  font-size: 13px;
+  padding: 8px;
+  box-sizing: border-box;
+  white-space: pre;
+  overflow-wrap: normal;
+  overflow-x: auto;
+}
+
+/* ---------- Result / AI section ---------- */
+
+.result-header {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
+.result-header h2 {
+  margin: 0;
+}
+
+.explanation-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #94a3b8;
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 12px;
+  padding: 2px 10px;
 }
 
 #editor {
   height: 320px;
   border: 1px solid #374151;
 }
+
+#explanation {
+  margin: 8px 0 0;
+  padding: 10px 12px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #cbd5e1;
+  background: #0f172a;
+  border: 1px solid #1e293b;
+  border-radius: 6px;
+  max-height: 80px;
+  overflow-y: auto;
+}
+
+/* ---------- Controls ---------- */
 
 .controls {
   display: flex;
@@ -50,8 +120,23 @@ button {
   color: white;
   padding: 8px 12px;
   border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+button:hover:not(:disabled) {
+  background: #3b82f6;
 }
 
 button:disabled {
   background: #6b7280;
+  cursor: not-allowed;
+}
+
+#finish-btn {
+  background: #16a34a;
+}
+
+#finish-btn:hover:not(:disabled) {
+  background: #22c55e;
 }

@@ -24,12 +24,12 @@ const progress = document.getElementById('progress');
 const localInput = document.getElementById('local-content') as HTMLTextAreaElement | null;
 const remoteInput = document.getElementById('remote-content') as HTMLTextAreaElement | null;
 const explanation = document.getElementById('explanation');
+const explanationLabel = document.getElementById('explanation-label');
+const conflictIndicator = document.getElementById('conflict-indicator');
 const status = document.getElementById('status');
 const prevButton = document.getElementById('prev-btn') as HTMLButtonElement | null;
 const nextButton = document.getElementById('next-btn') as HTMLButtonElement | null;
 const resolveButton = document.getElementById('resolve-btn') as HTMLButtonElement | null;
-const applyButton = document.getElementById('apply-btn') as HTMLButtonElement | null;
-const skipButton = document.getElementById('skip-btn') as HTMLButtonElement | null;
 const localButton = document.getElementById('use-local-btn') as HTMLButtonElement | null;
 const remoteButton = document.getElementById('use-remote-btn') as HTMLButtonElement | null;
 const finishButton = document.getElementById('finish-btn') as HTMLButtonElement | null;
@@ -79,26 +79,40 @@ function render(nextState: GuiSessionState): void {
       status.textContent = `No conflict markers found in MERGED file: ${nextState.mergedPath}`;
     }
     if (progress) progress.textContent = `0 / 0 • ${mergedPathLabel}`;
+    if (conflictIndicator) conflictIndicator.textContent = '';
     if (localInput) localInput.value = '';
     if (remoteInput) remoteInput.value = '';
     if (explanation) explanation.textContent = 'Open a file that still contains Git conflict markers.';
+    if (explanationLabel) explanationLabel.textContent = '';
     editor.setValue('');
     return;
   }
 
-  const block = nextState.blocks[nextState.currentIndex];
+  const idx = nextState.currentIndex;
+  const block = nextState.blocks[idx];
+
   if (progress) {
-    progress.textContent = `Conflict ${nextState.currentIndex + 1} of ${nextState.total} • ${mergedPathLabel}`;
+    progress.textContent = mergedPathLabel;
+  }
+
+  if (conflictIndicator) {
+    conflictIndicator.textContent = `${idx + 1} / ${nextState.total}`;
   }
 
   if (localInput) localInput.value = block.ours;
   if (remoteInput) remoteInput.value = block.theirs;
-  if (explanation) explanation.textContent = block.explanation || 'Generate AI to view explanation.';
+
+  if (explanationLabel) {
+    explanationLabel.textContent = `Conflict ${idx + 1} of ${nextState.total}`;
+  }
+  if (explanation) {
+    explanation.textContent = block.explanation || 'Generating AI explanation...';
+  }
 
   editor.setValue(block.appliedResolution ?? block.aiResult);
 
   if (status) {
-    status.textContent = block.actionTaken ? 'Action recorded for this conflict.' : 'Pending action.';
+    status.textContent = block.actionTaken ? 'AI resolution applied.' : 'Pending AI resolution...';
   }
 
   if (prevButton) prevButton.disabled = nextState.currentIndex === 0;
@@ -124,22 +138,6 @@ function wireActions(): void {
   resolveButton?.addEventListener('click', async () => {
     const current = assertState();
     render(await window.mergeGuiApi.generateAiResolution({ conflictIndex: current.currentIndex }));
-  });
-
-  applyButton?.addEventListener('click', async () => {
-    const current = assertState();
-    render(
-      await window.mergeGuiApi.applyResolution({
-        conflictIndex: current.currentIndex,
-        mode: 'apply-ai',
-        editedResolution: editor.getValue(),
-      })
-    );
-  });
-
-  skipButton?.addEventListener('click', async () => {
-    const current = assertState();
-    render(await window.mergeGuiApi.applyResolution({ conflictIndex: current.currentIndex, mode: 'skip' }));
   });
 
   localButton?.addEventListener('click', async () => {

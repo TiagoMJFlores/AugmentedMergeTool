@@ -17,6 +17,12 @@
     </header>
 
     <main>
+      <nav class="conflict-nav">
+        <button id="prev-btn" title="Previous conflict">Previous</button>
+        <span id="conflict-indicator"></span>
+        <button id="next-btn" title="Next conflict">Next</button>
+      </nav>
+
       <section class="top-grid">
         <article>
           <h2>LOCAL (HEAD)</h2>
@@ -29,17 +35,16 @@
       </section>
 
       <section class="result">
-        <h2>AI RESULT (Editable)</h2>
+        <div class="result-header">
+          <h2>AI RESULT (Editable)</h2>
+          <div id="explanation-label" class="explanation-label"></div>
+        </div>
         <div id="editor"></div>
         <p id="explanation"></p>
       </section>
 
       <section class="controls">
-        <button id="prev-btn">Previous</button>
-        <button id="next-btn">Next</button>
         <button id="resolve-btn">Regenerate AI</button>
-        <button id="apply-btn">Apply</button>
-        <button id="skip-btn">Skip</button>
         <button id="use-local-btn">Use LOCAL</button>
         <button id="use-remote-btn">Use REMOTE</button>
         <button id="finish-btn">Write MERGED & Exit</button>
