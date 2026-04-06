@@ -404,55 +404,23 @@ async function init(): Promise<void> {
   const current = assertState();
   if (current.total === 0) return;
 
-  // Find all conflicts that don't have an AI result yet
-  const pending = current.blocks
-    .map((block, index) => ({ block, index }))
-    .filter(({ block }) => !block.aiResult);
-
-  if (pending.length === 0) return;
+  const hasPending = current.blocks.some((block) => !block.aiResult);
+  if (!hasPending) return;
 
   if (status) {
-    status.textContent = `Generating AI suggestions for ${pending.length} conflict(s)...`;
+    status.textContent = `Generating AI suggestions for ${current.total} conflict(s)...`;
   }
 
-  // Generate AI for the current conflict first so the user sees it immediately
-  const currentIdx = current.currentIndex;
-  const currentPending = pending.find(({ index }) => index === currentIdx);
-  if (currentPending) {
-    try {
-      render(await window.mergeGuiApi.generateAiResolution({ conflictIndex: currentIdx }));
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      if (status) {
-        status.textContent = `Could not generate AI suggestion for conflict ${currentIdx + 1}: ${message}`;
-      }
-    }
-  }
-
-  // Generate AI for remaining conflicts in parallel
-  const remaining = pending.filter(({ index }) => index !== currentIdx);
-  if (remaining.length > 0) {
+  try {
+    render(await window.mergeGuiApi.generateAllAiResolutions());
     if (status) {
-      status.textContent = `Generating AI for ${remaining.length} remaining conflict(s)...`;
+      status.textContent = 'All AI suggestions ready.';
     }
-    const results = await Promise.allSettled(
-      remaining.map(({ index }) =>
-        window.mergeGuiApi.generateAiResolution({ conflictIndex: index })
-      )
-    );
-    // Re-render with the final state (last resolved promise has all results)
-    const lastFulfilled = [...results].reverse().find((r) => r.status === 'fulfilled');
-    if (lastFulfilled && lastFulfilled.status === 'fulfilled') {
-      render(lastFulfilled.value);
-    }
-    const failedCount = results.filter((r) => r.status === 'rejected').length;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
     if (status) {
-      status.textContent = failedCount > 0
-        ? `AI suggestions ready (${failedCount} failed).`
-        : 'All AI suggestions ready.';
+      status.textContent = `Could not generate AI suggestions: ${message}`;
     }
-  } else if (status) {
-    status.textContent = 'AI suggestion ready.';
   }
 }
 

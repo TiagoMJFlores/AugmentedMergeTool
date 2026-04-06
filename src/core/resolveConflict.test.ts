@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { buildPrompt, resolveConflict } from './resolveConflict.js';
+import { buildPrompt, resolveConflict, buildBatchPrompt, resolveAllConflicts } from './resolveConflict.js';
 import type { ConflictBlock } from './types.js';
 
 function makeBlock(overrides?: Partial<ConflictBlock>): ConflictBlock {
@@ -236,5 +236,160 @@ describe('resolveConflict', () => {
         max_tokens: 4096,
       })
     );
+  });
+});
+
+describe('buildBatchPrompt', () => {
+  it('should include all conflicts numbered', () => {
+    const blocks = [makeBlock(), makeBlock({ ours: { content: 'const y = 1;', ticket: null } })];
+    const prompt = buildBatchPrompt(blocks);
+
+    expect(prompt).toContain('Conflict 1 of 2');
+    expect(prompt).toContain('Conflict 2 of 2');
+    expect(prompt).toContain('const x = 1;');
+    expect(prompt).toContain('const y = 1;');
+  });
+
+  it('should request a JSON array with correct count', () => {
+    const blocks = [makeBlock(), makeBlock(), makeBlock()];
+    const prompt = buildBatchPrompt(blocks);
+
+    expect(prompt).toContain('JSON array with exactly 3 object(s)');
+    expect(prompt).toContain('This file has 3 conflict(s)');
+  });
+
+  it('should include ticket info when available', () => {
+    const blocks = [
+      makeBlock({
+        ours: { content: 'a', ticket: { ticketId: 'LIN-1', intentSummary: 'Add feature' } },
+      }),
+    ];
+    const prompt = buildBatchPrompt(blocks);
+
+    expect(prompt).toContain('Ticket LIN-1: Add feature');
+  });
+
+  it('should note when no ticket context exists', () => {
+    const blocks = [makeBlock()];
+    const prompt = buildBatchPrompt(blocks);
+
+    expect(prompt).toContain('No ticket context available');
+  });
+});
+
+describe('resolveAllConflicts', () => {
+  beforeEach(() => {
+    vi.resetModules();
+    vi.restoreAllMocks();
+  });
+
+  it('should return empty array for no blocks', async () => {
+    const { resolveAllConflicts: resolveAll } = await import('./resolveConflict.js');
+    const results = await resolveAll([]);
+    expect(results).toEqual([]);
+  });
+
+  it('should delegate to resolveConflict for single block', async () => {
+    const mockCreate = vi.fn().mockResolvedValue({
+      content: [{ type: 'text', text: JSON.stringify({ resolution: 'ok', explanation: 'single' }) }],
+    });
+
+    vi.doMock('@anthropic-ai/sdk', () => ({
+      default: class {
+        messages = { create: mockCreate };
+      },
+    }));
+
+    process.env.ANTHROPIC_API_KEY = 'test-key';
+
+    const { resolveAllConflicts: resolveAll } = await import('./resolveConflict.js');
+    const results = await resolveAll([makeBlock()]);
+
+    expect(results).toHaveLength(1);
+    expect(results[0].resolution).toBe('ok');
+    // Single block uses resolveConflict which sends max_tokens 4096
+    expect(mockCreate).toHaveBeenCalledWith(expect.objectContaining({ max_tokens: 4096 }));
+  });
+
+  it('should parse batch JSON array for multiple blocks', async () => {
+    const batchResponse = [
+      { resolution: 'const x = 3;', explanation: 'merged x' },
+      { resolution: 'const y = 4;', explanation: 'merged y' },
+    ];
+    const mockCreate = vi.fn().mockResolvedValue({
+      content: [{ type: 'text', text: JSON.stringify(batchResponse) }],
+    });
+
+    vi.doMock('@anthropic-ai/sdk', () => ({
+      default: class {
+        messages = { create: mockCreate };
+      },
+    }));
+
+    process.env.ANTHROPIC_API_KEY = 'test-key';
+
+    const { resolveAllConflicts: resolveAll } = await import('./resolveConflict.js');
+    const results = await resolveAll([makeBlock(), makeBlock()]);
+
+    expect(results).toHaveLength(2);
+    expect(results[0].resolution).toBe('const x = 3;');
+    expect(results[1].explanation).toBe('merged y');
+  });
+
+  it('should scale max_tokens with number of blocks', async () => {
+    const batchResponse = Array.from({ length: 3 }, (_, i) => ({
+      resolution: `res${i}`,
+      explanation: `exp${i}`,
+    }));
+    const mockCreate = vi.fn().mockResolvedValue({
+      content: [{ type: 'text', text: JSON.stringify(batchResponse) }],
+    });
+
+    vi.doMock('@anthropic-ai/sdk', () => ({
+      default: class {
+        messages = { create: mockCreate };
+      },
+    }));
+
+    process.env.ANTHROPIC_API_KEY = 'test-key';
+
+    const { resolveAllConflicts: resolveAll } = await import('./resolveConflict.js');
+    await resolveAll([makeBlock(), makeBlock(), makeBlock()]);
+
+    expect(mockCreate).toHaveBeenCalledWith(expect.objectContaining({ max_tokens: 12288 }));
+  });
+
+  it('should throw on array length mismatch', async () => {
+    const mockCreate = vi.fn().mockResolvedValue({
+      content: [{ type: 'text', text: JSON.stringify([{ resolution: 'a', explanation: 'b' }]) }],
+    });
+
+    vi.doMock('@anthropic-ai/sdk', () => ({
+      default: class {
+        messages = { create: mockCreate };
+      },
+    }));
+
+    process.env.ANTHROPIC_API_KEY = 'test-key';
+
+    const { resolveAllConflicts: resolveAll } = await import('./resolveConflict.js');
+    await expect(resolveAll([makeBlock(), makeBlock()])).rejects.toThrow('Expected JSON array of 2 results, got 1');
+  });
+
+  it('should throw on non-JSON response', async () => {
+    const mockCreate = vi.fn().mockResolvedValue({
+      content: [{ type: 'text', text: 'not json' }],
+    });
+
+    vi.doMock('@anthropic-ai/sdk', () => ({
+      default: class {
+        messages = { create: mockCreate };
+      },
+    }));
+
+    process.env.ANTHROPIC_API_KEY = 'test-key';
+
+    const { resolveAllConflicts: resolveAll } = await import('./resolveConflict.js');
+    await expect(resolveAll([makeBlock(), makeBlock()])).rejects.toThrow('Failed to parse batch Claude response');
   });
 });

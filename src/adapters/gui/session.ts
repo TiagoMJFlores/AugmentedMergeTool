@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import { buildConflictBlocks } from '../../core/buildConflictBlocks.js';
-import { resolveConflict } from '../../core/resolveConflict.js';
+import { resolveConflict, resolveAllConflicts } from '../../core/resolveConflict.js';
 import { createProvider, normalizeProvider } from '../../core/providers/index.js';
 import { applyResolutionsToContent, type ResolutionDecision } from '../../core/applyResolutions.js';
 import type { ConflictBlock } from '../../core/types.js';
@@ -262,6 +262,21 @@ export class GuiSession {
     target.selectedSide = null;
     target.actionTaken = true;
 
+    return this.getState();
+  }
+
+  async generateAllAiResolutions(): Promise<GuiSessionState> {
+    const results = await resolveAllConflicts(this.data.sourceBlocks);
+    for (let i = 0; i < results.length; i++) {
+      const target = this.data.blocks[i];
+      if (!target) continue;
+      target.aiResult = results[i].resolution;
+      target.explanation = results[i].explanation;
+      target.appliedResolution = results[i].resolution;
+      target.selectedAction = 'choose-ai';
+      target.selectedSide = null;
+      target.actionTaken = true;
+    }
     return this.getState();
   }
 
