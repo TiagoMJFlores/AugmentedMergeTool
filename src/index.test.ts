@@ -52,12 +52,14 @@ describe('CLI apply behavior', () => {
           theirs: { content: 'theirs1', ticket: null },
           range: { start: 2, end: 6 },
           surroundingContext: '',
+          baseContent: '',
         },
         {
           ours: { content: 'ours2', ticket: null },
           theirs: { content: 'theirs2', ticket: null },
           range: { start: 8, end: 12 },
           surroundingContext: '',
+          baseContent: '',
         },
       ]),
     }));
@@ -161,18 +163,21 @@ describe('CLI apply behavior', () => {
           theirs: { content: 'theirs1', ticket: null },
           range: { start: 2, end: 6 },
           surroundingContext: '',
+          baseContent: '',
         },
         {
           ours: { content: 'ours2', ticket: null },
           theirs: { content: 'theirs2', ticket: null },
           range: { start: 8, end: 12 },
           surroundingContext: '',
+          baseContent: '',
         },
         {
           ours: { content: 'ours3', ticket: null },
           theirs: { content: 'theirs3', ticket: null },
           range: { start: 14, end: 18 },
           surroundingContext: '',
+          baseContent: '',
         },
       ]),
     }));
@@ -272,18 +277,21 @@ describe('CLI apply behavior', () => {
           theirs: { content: 'theirs1', ticket: null },
           range: { start: 2, end: 6 },
           surroundingContext: '',
+          baseContent: '',
         },
         {
           ours: { content: 'ours2', ticket: null },
           theirs: { content: 'theirs2', ticket: null },
           range: { start: 8, end: 12 },
           surroundingContext: '',
+          baseContent: '',
         },
         {
           ours: { content: 'ours3', ticket: null },
           theirs: { content: 'theirs3', ticket: null },
           range: { start: 14, end: 18 },
           surroundingContext: '',
+          baseContent: '',
         },
       ]),
     }));

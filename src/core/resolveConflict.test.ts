@@ -1,5 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { buildPrompt, resolveConflict, buildBatchPrompt, resolveAllConflicts } from './resolveConflict.js';
+import {
+  buildPrompt,
+  resolveConflict,
+  buildBatchPrompt,
+  resolveAllConflicts,
+  validateResolution,
+  isWhitespaceOnlyDiff,
+  estimateTokens,
+  windowContent,
+  windowConflictSides,
+} from './resolveConflict.js';
 import type { ConflictBlock } from './types.js';
 
 function makeBlock(overrides?: Partial<ConflictBlock>): ConflictBlock {
@@ -14,6 +24,7 @@ function makeBlock(overrides?: Partial<ConflictBlock>): ConflictBlock {
     },
     range: { start: 10, end: 15 },
     surroundingContext: 'function foo() {\n  // ...\n}',
+    baseContent: '',
     ...overrides,
   };
 }
@@ -391,5 +402,184 @@ describe('resolveAllConflicts', () => {
 
     const { resolveAllConflicts: resolveAll } = await import('./resolveConflict.js');
     await expect(resolveAll([makeBlock(), makeBlock()])).rejects.toThrow('Failed to parse batch Claude response');
+  });
+});
+
+// --- Feature 1: Output Validation ---
+
+describe('validateResolution', () => {
+  it('should pass for clean resolution', () => {
+    expect(() => validateResolution('const x = 3;')).not.toThrow();
+  });
+
+  it('should throw for resolution with <<<<<<< markers', () => {
+    expect(() => validateResolution('<<<<<<< HEAD\nconst x = 1;')).toThrow('leftover conflict markers');
+  });
+
+  it('should throw for resolution with ======= markers', () => {
+    expect(() => validateResolution('const x = 1;\n=======\nconst x = 2;')).toThrow('leftover conflict markers');
+  });
+
+  it('should throw for resolution with >>>>>>> markers', () => {
+    expect(() => validateResolution('const x = 2;\n>>>>>>> branch')).toThrow('leftover conflict markers');
+  });
+
+  it('should NOT throw for markdown heading underlines with =======', () => {
+    // Markdown uses ======= under headings but with text on the same line or content after
+    expect(() => validateResolution('Title\n======= extra')).not.toThrow();
+  });
+
+  it('should include conflict index in error message when provided', () => {
+    expect(() => validateResolution('<<<<<<< HEAD', 2)).toThrow('Conflict 3 resolution');
+  });
+});
+
+// --- Feature 2: Base 3-Way Context ---
+
+describe('base 3-way context in prompts', () => {
+  it('should include base section in single prompt when baseContent is provided', () => {
+    const block = makeBlock({ baseContent: 'const x = 0;' });
+    const prompt = buildPrompt(block);
+
+    expect(prompt).toContain('Base version (common ancestor)');
+    expect(prompt).toContain('const x = 0;');
+    expect(prompt).toContain('Compare each side against the base');
+  });
+
+  it('should omit base section when baseContent is empty', () => {
+    const block = makeBlock({ baseContent: '' });
+    const prompt = buildPrompt(block);
+
+    expect(prompt).not.toContain('Base version');
+    expect(prompt).not.toContain('Compare each side against the base');
+  });
+
+  it('should include base section in batch prompt', () => {
+    const blocks = [
+      makeBlock({ baseContent: 'const original = true;' }),
+      makeBlock({ baseContent: '' }),
+    ];
+    const prompt = buildBatchPrompt(blocks);
+
+    expect(prompt).toContain('const original = true;');
+    expect(prompt).toContain('Compare each side against the base');
+  });
+});
+
+// --- Feature 4: Whitespace-Only Fast Path ---
+
+describe('isWhitespaceOnlyDiff', () => {
+  it('should return true for identical strings', () => {
+    expect(isWhitespaceOnlyDiff('const x = 1;', 'const x = 1;')).toBe(true);
+  });
+
+  it('should return true when only indentation differs', () => {
+    expect(isWhitespaceOnlyDiff('  const x = 1;', '    const x = 1;')).toBe(true);
+  });
+
+  it('should return true when trailing whitespace differs', () => {
+    expect(isWhitespaceOnlyDiff('const x = 1;  ', 'const x = 1;')).toBe(true);
+  });
+
+  it('should return true for tab vs space differences', () => {
+    expect(isWhitespaceOnlyDiff('\tconst x = 1;', '  const x = 1;')).toBe(true);
+  });
+
+  it('should return false for actual content differences', () => {
+    expect(isWhitespaceOnlyDiff('const x = 1;', 'const x = 2;')).toBe(false);
+  });
+
+  it('should return false for different line count with different content', () => {
+    expect(isWhitespaceOnlyDiff('line1\nline2', 'line1\nline3')).toBe(false);
+  });
+
+  it('should return false when blank lines are added or removed', () => {
+    expect(isWhitespaceOnlyDiff('line1\n\nline2', 'line1\nline2')).toBe(false);
+  });
+});
+
+// --- Feature 5: Token Windowing ---
+
+describe('token windowing', () => {
+  it('should return text unchanged when under threshold', () => {
+    const text = 'short text';
+    expect(windowContent(text, 1000)).toBe(text);
+  });
+
+  it('should truncate large text with marker', () => {
+    const lines = Array.from({ length: 200 }, (_, i) => `line ${i}: ${'x'.repeat(50)}`);
+    const text = lines.join('\n');
+    const result = windowContent(text, 500);
+
+    expect(result).toContain('truncated');
+    expect(result.length).toBeLessThan(text.length);
+  });
+
+  it('should preserve head and tail lines', () => {
+    const lines = Array.from({ length: 100 }, (_, i) => `line-${i}`);
+    const text = lines.join('\n');
+    const result = windowContent(text, 200);
+
+    expect(result).toContain('line-0');
+    expect(result).toContain('line-99');
+  });
+
+  it('estimateTokens should approximate text length / 4', () => {
+    expect(estimateTokens('a'.repeat(400))).toBe(100);
+  });
+});
+
+describe('windowConflictSides', () => {
+  it('should return small content unchanged', () => {
+    const { ours, theirs } = windowConflictSides('line1\nline2', 'line1\nline3');
+    expect(ours).toBe('line1\nline2');
+    expect(theirs).toBe('line1\nline3');
+  });
+
+  it('should truncate identical stretches in large conflicts', () => {
+    // 100 identical lines, then 1 diff, then 100 more identical lines
+    const shared = Array.from({ length: 100 }, (_, i) => `shared-${i}`);
+    const oursLines = [...shared, 'OURS CHANGE', ...shared];
+    const theirsLines = [...shared, 'THEIRS CHANGE', ...shared];
+    const ours = oursLines.join('\n');
+    const theirs = theirsLines.join('\n');
+
+    // Force windowing with low maxTokens
+    const result = windowConflictSides(ours, theirs, 3, 50);
+
+    expect(result.ours).toContain('OURS CHANGE');
+    expect(result.theirs).toContain('THEIRS CHANGE');
+    expect(result.ours).toContain('identical lines truncated');
+    expect(result.ours.split('\n').length).toBeLessThan(oursLines.length);
+  });
+
+  it('should keep context lines around diff regions', () => {
+    const shared = Array.from({ length: 50 }, (_, i) => `shared-${i}`);
+    const oursLines = [...shared, 'DIFF-LINE', ...shared];
+    const theirsLines = [...shared, 'OTHER-LINE', ...shared];
+
+    const result = windowConflictSides(
+      oursLines.join('\n'),
+      theirsLines.join('\n'),
+      3,
+      50
+    );
+
+    // Lines adjacent to the diff should be preserved
+    expect(result.ours).toContain('shared-47');
+    expect(result.ours).toContain('shared-48');
+    expect(result.ours).toContain('shared-49');
+    expect(result.ours).toContain('DIFF-LINE');
+  });
+
+  it('should preserve all lines when everything differs', () => {
+    const ours = Array.from({ length: 10 }, (_, i) => `ours-${i}`).join('\n');
+    const theirs = Array.from({ length: 10 }, (_, i) => `theirs-${i}`).join('\n');
+
+    const result = windowConflictSides(ours, theirs, 3, 50);
+
+    // All lines differ, so nothing should be truncated
+    expect(result.ours).not.toContain('truncated');
+    expect(result.theirs).not.toContain('truncated');
   });
 });

@@ -218,7 +218,7 @@ export class GuiSession {
 
     const originalMergedContent = fs.readFileSync(args.merged, 'utf-8');
     const sideViews = buildSideViews(originalMergedContent);
-    const sourceBlocks = await buildConflictBlocks(args.merged, ticketProvider);
+    const sourceBlocks = await buildConflictBlocks(args.merged, ticketProvider, args.base);
     const blocks = sourceBlocks.map((block, index) => ({
       id: `conflict-${index + 1}`,
       index,

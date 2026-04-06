@@ -181,10 +181,16 @@ async function fetchTicketContext(
  */
 export async function buildConflictBlocks(
   filePath: string,
-  provider: TicketProvider
+  provider: TicketProvider,
+  basePath?: string
 ): Promise<ConflictBlock[]> {
   const fileContent = fs.readFileSync(filePath, 'utf-8');
   const parsed = parseConflictMarkers(fileContent);
+
+  let baseLines: string[] | null = null;
+  if (basePath && basePath !== filePath && fs.existsSync(basePath)) {
+    baseLines = fs.readFileSync(basePath, 'utf-8').split('\n');
+  }
 
   if (parsed.length === 0) return [];
 
@@ -223,6 +229,44 @@ export async function buildConflictBlocks(
       fetchTicketContext(provider, theirsTicketId),
     ]);
 
+    let baseContent = '';
+    if (baseLines) {
+      // The merged file's line numbers include conflict markers, so they don't
+      // map directly to the base file.  Instead, find the base region by
+      // looking for the lines immediately before and after the conflict in the
+      // merged file (which are non-conflict lines present in all three versions)
+      // and locating those anchors in the base.
+      const mergedLines = fileContent.split('\n');
+      const anchorBefore = conflict.range.start > 1
+        ? mergedLines[conflict.range.start - 2]  // line before <<<<<<<
+        : null;
+      const anchorAfter = conflict.range.end < mergedLines.length
+        ? mergedLines[conflict.range.end]  // line after >>>>>>>
+        : null;
+
+      let baseStart = 0;
+      let baseEnd = baseLines.length;
+
+      if (anchorBefore !== null) {
+        for (let bi = 0; bi < baseLines.length; bi++) {
+          if (baseLines[bi] === anchorBefore) {
+            baseStart = bi + 1;
+            break;
+          }
+        }
+      }
+      if (anchorAfter !== null) {
+        for (let bi = baseStart; bi < baseLines.length; bi++) {
+          if (baseLines[bi] === anchorAfter) {
+            baseEnd = bi;
+            break;
+          }
+        }
+      }
+
+      baseContent = baseLines.slice(baseStart, baseEnd).join('\n');
+    }
+
     results.push({
       ours: {
         content: conflict.oursContent,
@@ -234,6 +278,7 @@ export async function buildConflictBlocks(
       },
       range: conflict.range,
       surroundingContext: conflict.surroundingContext,
+      baseContent,
     });
   }
 
