@@ -65,11 +65,11 @@ ipcMain.handle('gui:navigate', async (_event, index: number) => {
   return session.navigateTo(index);
 });
 
-ipcMain.handle('gui:finish', async () => {
+ipcMain.handle('gui:finish', async (_event, finalContent?: string) => {
   if (!session) {
     throw new Error('Session not initialized');
   }
-  session.finish();
+  session.finish(finalContent);
   app.exit(0);
 });
 

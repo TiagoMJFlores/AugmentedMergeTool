@@ -12,7 +12,6 @@
   </head>
   <body>
     <header>
-      <h1>AI-assisted Merge Resolver</h1>
       <div id="progress"></div>
     </header>
 
@@ -21,33 +20,43 @@
         <button id="prev-btn" title="Previous conflict">Previous</button>
         <span id="conflict-indicator"></span>
         <button id="next-btn" title="Next conflict">Next</button>
+        <button id="resolve-btn">Regenerate AI</button>
+        <button id="finish-btn">Write MERGED & Exit</button>
       </nav>
 
       <section class="top-grid">
         <article>
           <h2>LOCAL (HEAD)</h2>
-          <textarea id="local-content" readonly></textarea>
+          <div id="local-content" class="code-pane" aria-label="Local file content"></div>
+        </article>
+        <article class="middle-controls">
+          <div id="conflict-gutter" class="conflict-gutter" aria-label="Conflict selectors"></div>
         </article>
         <article>
           <h2>REMOTE (incoming)</h2>
-          <textarea id="remote-content" readonly></textarea>
+          <div id="remote-content" class="code-pane" aria-label="Remote file content"></div>
         </article>
       </section>
 
       <section class="result">
         <div class="result-header">
-          <h2>AI RESULT (Editable)</h2>
           <div id="explanation-label" class="explanation-label"></div>
         </div>
-        <div id="editor"></div>
         <p id="explanation"></p>
+        <div class="result-wrapper">
+          <div id="result-highlight" class="result-highlight" aria-hidden="true"></div>
+          <textarea id="result-editor" class="result-editor" aria-label="Editable final merged content"></textarea>
+        </div>
       </section>
 
-      <section class="controls">
-        <button id="resolve-btn">Regenerate AI</button>
-        <button id="use-local-btn">Use LOCAL</button>
-        <button id="use-remote-btn">Use REMOTE</button>
-        <button id="finish-btn">Write MERGED & Exit</button>
+      <section class="actions-panel">
+        <label for="actions-select">Actions</label>
+        <select id="actions-select">
+          <option value="choose-left">Choose left</option>
+          <option value="choose-right">Choose right</option>
+          <option value="choose-both-left-first">Choose both (left first)</option>
+          <option value="choose-both-right-first">Choose both (right first)</option>
+        </select>
       </section>
 
       <p id="status"></p>
