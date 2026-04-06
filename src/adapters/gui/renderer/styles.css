@@ -64,6 +64,7 @@ main {
 }
 
 .code-pane {
+  position: relative; /* needed so child offsetTop is relative to this container */
   width: 100%;
   height: 32vh;
   min-height: 220px;
