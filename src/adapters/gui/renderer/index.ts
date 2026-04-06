@@ -399,19 +399,57 @@ async function init(): Promise<void> {
   await refresh();
 
   const current = assertState();
-  const currentBlock = current.blocks[current.currentIndex];
-  if (current.total > 0 && currentBlock && !currentBlock.aiResult) {
-    if (status) {
-      status.textContent = 'Generating initial AI suggestion...';
-    }
+  if (current.total === 0) return;
+
+  // Find all conflicts that don't have an AI result yet
+  const pending = current.blocks
+    .map((block, index) => ({ block, index }))
+    .filter(({ block }) => !block.aiResult);
+
+  if (pending.length === 0) return;
+
+  if (status) {
+    status.textContent = `Generating AI suggestions for ${pending.length} conflict(s)...`;
+  }
+
+  // Generate AI for the current conflict first so the user sees it immediately
+  const currentIdx = current.currentIndex;
+  const currentPending = pending.find(({ index }) => index === currentIdx);
+  if (currentPending) {
     try {
-      render(await window.mergeGuiApi.generateAiResolution({ conflictIndex: current.currentIndex }));
+      render(await window.mergeGuiApi.generateAiResolution({ conflictIndex: currentIdx }));
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       if (status) {
-        status.textContent = `Could not generate initial AI suggestion: ${message}`;
+        status.textContent = `Could not generate AI suggestion for conflict ${currentIdx + 1}: ${message}`;
       }
     }
+  }
+
+  // Generate AI for remaining conflicts in parallel
+  const remaining = pending.filter(({ index }) => index !== currentIdx);
+  if (remaining.length > 0) {
+    if (status) {
+      status.textContent = `Generating AI for ${remaining.length} remaining conflict(s)...`;
+    }
+    const results = await Promise.allSettled(
+      remaining.map(({ index }) =>
+        window.mergeGuiApi.generateAiResolution({ conflictIndex: index })
+      )
+    );
+    // Re-render with the final state (last resolved promise has all results)
+    const lastFulfilled = [...results].reverse().find((r) => r.status === 'fulfilled');
+    if (lastFulfilled && lastFulfilled.status === 'fulfilled') {
+      render(lastFulfilled.value);
+    }
+    const failedCount = results.filter((r) => r.status === 'rejected').length;
+    if (status) {
+      status.textContent = failedCount > 0
+        ? `AI suggestions ready (${failedCount} failed).`
+        : 'All AI suggestions ready.';
+    }
+  } else if (status) {
+    status.textContent = 'AI suggestion ready.';
   }
 }
 
