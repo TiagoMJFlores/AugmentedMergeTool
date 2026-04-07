@@ -1,6 +1,6 @@
 import type { MergeToolArgs } from './contracts.js';
 
-export function parseMergeToolArgs(argv: string[]): MergeToolArgs {
+export function parseMergeToolArgs(argv: string[]): MergeToolArgs | null {
   const positional = argv.filter((arg) => !arg.startsWith('-'));
 
   if (positional.length >= 4) {
@@ -13,5 +13,5 @@ export function parseMergeToolArgs(argv: string[]): MergeToolArgs {
     return { local: merged, base: merged, remote: merged, merged };
   }
 
-  throw new Error('Expected at least 1 path argument for MERGED file');
+  return null;
 }

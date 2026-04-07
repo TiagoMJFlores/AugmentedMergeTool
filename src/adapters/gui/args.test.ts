@@ -47,7 +47,11 @@ describe('parseMergeToolArgs', () => {
     });
   });
 
-  it('throws when no positional paths are provided', () => {
-    expect(() => parseMergeToolArgs(['--inspect=9229'])).toThrow('Expected at least 1 path');
+  it('returns null when no positional paths are provided', () => {
+    expect(parseMergeToolArgs(['--inspect=9229'])).toBeNull();
+  });
+
+  it('returns null when called with empty args', () => {
+    expect(parseMergeToolArgs([])).toBeNull();
   });
 });

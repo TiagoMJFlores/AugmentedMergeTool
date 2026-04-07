@@ -1,11 +1,38 @@
 import 'dotenv/config';
-import { app, BrowserWindow, ipcMain } from 'electron';
 import * as path from 'path';
+import { app, BrowserWindow, ipcMain } from 'electron';
+import simpleGit from 'simple-git';
 import { GuiSession } from './session.js';
-import type { ApplyResolutionInput, ResolveAndStoreInput } from './contracts.js';
+import type { ApplyResolutionInput, GuiSessionState, GuiMultiFileState, ResolveAndStoreInput } from './contracts.js';
 import { parseMergeToolArgs } from './args.js';
 
-let session: GuiSession | null = null;
+let activeSession: GuiSession | null = null;
+const sessions = new Map<string, GuiSession>();
+let multiFileMode = false;
+
+function getActiveSession(): GuiSession {
+  if (!activeSession) throw new Error('Session not initialized');
+  return activeSession;
+}
+
+function buildMultiFileState(): GuiMultiFileState | null {
+  if (!multiFileMode) return null;
+  return {
+    files: [...sessions.entries()].map(([filePath, session]) => {
+      const s = session.getState();
+      return {
+        path: filePath,
+        conflictCount: s.total,
+        allResolved: s.complete,
+      };
+    }),
+    activeFilePath: getActiveSession().getState().mergedPath,
+  };
+}
+
+function injectMultiFile(state: GuiSessionState): GuiSessionState {
+  return { ...state, multiFile: buildMultiFileState() };
+}
 
 async function createMainWindow(): Promise<void> {
   const mainWindow = new BrowserWindow({
@@ -29,7 +56,38 @@ async function createMainWindow(): Promise<void> {
 app.whenReady().then(async () => {
   try {
     const args = parseMergeToolArgs(process.argv.slice(2));
-    session = await GuiSession.create(args);
+
+    if (args) {
+      // Single-file mode — explicit path provided
+      activeSession = await GuiSession.create(args);
+    } else {
+      // Multi-file mode — auto-detect from git status
+      const git = simpleGit(process.cwd());
+      const status = await git.status();
+      const conflictedFiles = status.conflicted;
+
+      if (conflictedFiles.length === 0) {
+        console.error('No conflicted files found. Run this from a repo with merge conflicts.');
+        app.exit(1);
+        return;
+      }
+
+      multiFileMode = true;
+
+      for (const relPath of conflictedFiles) {
+        const absPath = path.resolve(process.cwd(), relPath);
+        const session = await GuiSession.create({
+          local: absPath,
+          base: absPath,
+          remote: absPath,
+          merged: absPath,
+        });
+        sessions.set(relPath, session);
+      }
+
+      activeSession = sessions.values().next().value!;
+    }
+
     await createMainWindow();
   } catch (error) {
     console.error(error);
@@ -37,46 +95,61 @@ app.whenReady().then(async () => {
   }
 });
 
+// --- IPC Handlers ---
+
 ipcMain.handle('gui:get-state', async () => {
-  if (!session) {
-    throw new Error('Session not initialized');
-  }
-  return session.getState();
+  return injectMultiFile(getActiveSession().getState());
 });
 
 ipcMain.handle('gui:resolve', async (_event, input: ResolveAndStoreInput) => {
-  if (!session) {
-    throw new Error('Session not initialized');
-  }
-  return session.generateAiResolution(input);
+  return injectMultiFile(await getActiveSession().generateAiResolution(input));
 });
 
 ipcMain.handle('gui:resolve-all', async () => {
-  if (!session) {
-    throw new Error('Session not initialized');
-  }
-  return session.generateAllAiResolutions();
+  return injectMultiFile(await getActiveSession().generateAllAiResolutions());
 });
 
 ipcMain.handle('gui:apply', async (_event, input: ApplyResolutionInput) => {
-  if (!session) {
-    throw new Error('Session not initialized');
-  }
-  return session.applyResolution(input);
+  return injectMultiFile(getActiveSession().applyResolution(input));
 });
 
 ipcMain.handle('gui:navigate', async (_event, index: number) => {
-  if (!session) {
-    throw new Error('Session not initialized');
-  }
-  return session.navigateTo(index);
+  return injectMultiFile(getActiveSession().navigateTo(index));
 });
 
 ipcMain.handle('gui:finish', async (_event, finalContent?: string) => {
-  if (!session) {
-    throw new Error('Session not initialized');
-  }
+  const session = getActiveSession();
   session.finish(finalContent);
+
+  if (!multiFileMode) {
+    app.exit(0);
+    return;
+  }
+
+  // Multi-file: advance to next unresolved file
+  for (const [, s] of sessions) {
+    if (!s.getState().complete) {
+      activeSession = s;
+      return;
+    }
+  }
+  // All done
+  app.exit(0);
+});
+
+ipcMain.handle('gui:switch-file', async (_event, filePath: string) => {
+  const session = sessions.get(filePath);
+  if (!session) throw new Error(`No session for file: ${filePath}`);
+  activeSession = session;
+  return injectMultiFile(session.getState());
+});
+
+ipcMain.handle('gui:finish-all', async () => {
+  for (const [, session] of sessions) {
+    if (session.getState().complete) {
+      session.finish();
+    }
+  }
   app.exit(0);
 });
 
