@@ -312,9 +312,28 @@ main {
   background: rgba(59, 130, 246, 0.2);
 }
 
+/* Auto-resolved changes: lines that differ between LOCAL/REMOTE but are
+   outside conflict markers (git resolved them automatically). Subtle
+   style to distinguish from actual conflicts. */
+.change-line {
+  background: rgba(139, 92, 246, 0.12);
+  border-left: 2px solid rgba(139, 92, 246, 0.4);
+}
+
 .active-line {
   background: rgba(239, 68, 68, 0.22);
   border-left: 2px solid #ef4444;
+}
+
+/* Identical lines inside a conflict block — grey to show the block boundary */
+.match-line {
+  background: rgba(148, 163, 184, 0.08);
+}
+
+/* Identical lines inside the ACTIVE conflict block — slightly stronger grey */
+.active-match-line {
+  background: rgba(148, 163, 184, 0.15);
+  border-left: 2px solid rgba(148, 163, 184, 0.3);
 }
 
 .middle-controls {

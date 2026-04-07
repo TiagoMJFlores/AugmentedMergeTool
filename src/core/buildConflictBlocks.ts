@@ -80,6 +80,108 @@ export function parseConflictMarkers(fileContent: string): ParsedConflict[] {
 }
 
 /**
+ * Split a conflict block at runs of identical lines between ours and theirs.
+ *
+ * Git sometimes groups multiple independent changes into one big
+ * <<<<<<< ... >>>>>>> block. This function finds shared line runs in the
+ * middle and splits the block into smaller, more precise sub-conflicts.
+ *
+ * Uses a greedy matching approach: walk both sides, when trimmed lines
+ * match advance both, when they don't scan ahead for the next match.
+ */
+export function splitConflict(conflict: ParsedConflict, fileLines: string[]): ParsedConflict[] {
+  const oursLines = conflict.oursContent.split('\n');
+  const theirsLines = conflict.theirsContent.split('\n');
+
+  // Align the two sides using greedy LCS-like matching
+  type AlignedPair = { type: 'shared'; line: string } | { type: 'diff'; ours: string[]; theirs: string[] };
+  const aligned: AlignedPair[] = [];
+  let oi = 0;
+  let ti = 0;
+
+  while (oi < oursLines.length || ti < theirsLines.length) {
+    // Check if current lines match
+    if (oi < oursLines.length && ti < theirsLines.length && oursLines[oi].trim() === theirsLines[ti].trim()) {
+      aligned.push({ type: 'shared', line: oursLines[oi] });
+      oi++;
+      ti++;
+      continue;
+    }
+
+    // Lines differ — collect diff region until we find the next match
+    const diffOurs: string[] = [];
+    const diffTheirs: string[] = [];
+
+    // Look ahead for the next shared line
+    let foundMatch = false;
+    const maxLook = Math.max(oursLines.length - oi, theirsLines.length - ti);
+    for (let look = 1; look <= maxLook && !foundMatch; look++) {
+      // Check if ours[oi + look] matches theirs[ti + look]
+      if (oi + look < oursLines.length && ti + look < theirsLines.length &&
+          oursLines[oi + look].trim() === theirsLines[ti + look].trim()) {
+        // Collect everything before the match as diff
+        for (let k = 0; k < look; k++) {
+          if (oi + k < oursLines.length) diffOurs.push(oursLines[oi + k]);
+          if (ti + k < theirsLines.length) diffTheirs.push(theirsLines[ti + k]);
+        }
+        oi += look;
+        ti += look;
+        foundMatch = true;
+      }
+      // Check if ours[oi] matches theirs[ti + look] (insertion in theirs)
+      if (!foundMatch && ti + look < theirsLines.length &&
+          oi < oursLines.length && oursLines[oi].trim() === theirsLines[ti + look].trim()) {
+        for (let k = 0; k < look; k++) {
+          if (ti + k < theirsLines.length) diffTheirs.push(theirsLines[ti + k]);
+        }
+        ti += look;
+        foundMatch = true;
+      }
+      // Check if ours[oi + look] matches theirs[ti] (insertion in ours)
+      if (!foundMatch && oi + look < oursLines.length &&
+          ti < theirsLines.length && oursLines[oi + look].trim() === theirsLines[ti].trim()) {
+        for (let k = 0; k < look; k++) {
+          if (oi + k < oursLines.length) diffOurs.push(oursLines[oi + k]);
+        }
+        oi += look;
+        foundMatch = true;
+      }
+    }
+
+    if (!foundMatch) {
+      // No more matches — dump remaining lines as one diff
+      while (oi < oursLines.length) diffOurs.push(oursLines[oi++]);
+      while (ti < theirsLines.length) diffTheirs.push(theirsLines[ti++]);
+    }
+
+    if (diffOurs.length > 0 || diffTheirs.length > 0) {
+      aligned.push({ type: 'diff', ours: diffOurs, theirs: diffTheirs });
+    }
+  }
+
+  // Count diff regions
+  const diffRegions = aligned.filter((a) => a.type === 'diff');
+  if (diffRegions.length <= 1) return [conflict];
+
+  // Split into sub-conflicts
+  const results: ParsedConflict[] = [];
+  for (const entry of aligned) {
+    if (entry.type === 'diff') {
+      const contextStart = Math.max(0, conflict.range.start - 1 - 20);
+      const contextEnd = Math.min(fileLines.length, conflict.range.end + 20);
+      results.push({
+        oursContent: entry.ours.join('\n'),
+        theirsContent: entry.theirs.join('\n'),
+        range: conflict.range, // keep original range for git context
+        surroundingContext: fileLines.slice(contextStart, contextEnd).join('\n'),
+      });
+    }
+  }
+
+  return results;
+}
+
+/**
  * Extract a Linear ticket ID from a commit message.
  */
 export function commitToTicketId(message: string): string | null {

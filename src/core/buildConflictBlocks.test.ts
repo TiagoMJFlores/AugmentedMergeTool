@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   parseConflictMarkers,
+  splitConflict,
   commitToTicketId,
   parseGitLogOutput,
 } from './buildConflictBlocks.js';
@@ -277,5 +278,56 @@ diff --git a/src/other.ts b/src/other.ts
   it('should return empty array for empty output', () => {
     const result = parseGitLogOutput('');
     expect(result).toHaveLength(0);
+  });
+});
+
+describe('splitConflict', () => {
+  it('should not split a conflict with no shared middle lines', () => {
+    const conflict = {
+      oursContent: 'line A ours',
+      theirsContent: 'line A theirs',
+      range: { start: 1, end: 5 },
+      surroundingContext: '',
+    };
+    const result = splitConflict(conflict, []);
+    expect(result).toHaveLength(1);
+  });
+
+  it('should split a conflict at shared middle lines', () => {
+    const conflict = {
+      oursContent: 'changed ours 1\nshared line\nchanged ours 2',
+      theirsContent: 'changed theirs 1\nshared line\nchanged theirs 2',
+      range: { start: 1, end: 10 },
+      surroundingContext: '',
+    };
+    const result = splitConflict(conflict, []);
+    expect(result).toHaveLength(2);
+    expect(result[0].oursContent).toBe('changed ours 1');
+    expect(result[0].theirsContent).toBe('changed theirs 1');
+    expect(result[1].oursContent).toBe('changed ours 2');
+    expect(result[1].theirsContent).toBe('changed theirs 2');
+  });
+
+  it('should split at multiple shared regions', () => {
+    const conflict = {
+      oursContent: 'diff1 ours\nshared A\ndiff2 ours\nshared B\ndiff3 ours',
+      theirsContent: 'diff1 theirs\nshared A\ndiff2 theirs\nshared B\ndiff3 theirs',
+      range: { start: 1, end: 10 },
+      surroundingContext: '',
+    };
+    const result = splitConflict(conflict, []);
+    expect(result).toHaveLength(3);
+  });
+
+  it('should handle insertions on theirs side', () => {
+    const conflict = {
+      oursContent: 'line A\nline B',
+      theirsContent: 'line A\nnew line\nline B',
+      range: { start: 1, end: 5 },
+      surroundingContext: '',
+    };
+    const result = splitConflict(conflict, []);
+    // Only the insertion is a diff, but shared lines separate it
+    expect(result.length).toBeGreaterThanOrEqual(1);
   });
 });

@@ -1,4 +1,6 @@
 import * as fs from 'fs';
+import * as path from 'path';
+import simpleGit from 'simple-git';
 import { buildConflictBlocks } from '../../core/buildConflictBlocks.js';
 import { resolveConflict, resolveAllConflicts } from '../../core/resolveConflict.js';
 import { createProvider, normalizeProvider } from '../../core/providers/index.js';
@@ -35,6 +37,122 @@ interface PreviewBuildResult {
   content: string;
   ranges: Array<{ start: number; end: number }>;
   lineOwners: number[];
+}
+
+/**
+ * Fetch the real LOCAL/REMOTE/BASE content from git's staging area.
+ * During a merge conflict, git stores three versions:
+ *   :1:file = base (common ancestor)
+ *   :2:file = ours (LOCAL / HEAD)
+ *   :3:file = theirs (REMOTE / incoming)
+ */
+async function fetchGitSideVersions(
+  filePath: string
+): Promise<{ local: string; remote: string; base: string } | null> {
+  try {
+    const dir = path.dirname(filePath);
+    const git = simpleGit(dir);
+    const topLevel = (await git.revparse(['--show-toplevel'])).trim();
+    const relPath = path.relative(topLevel, filePath);
+
+    const showRef = async (ref: string): Promise<string> => {
+      try {
+        return await git.raw(['show', `${ref}:${relPath}`]);
+      } catch {
+        return '';
+      }
+    };
+
+    // Try index stages first (:2: ours, :3: theirs, :1: base)
+    let [local, remote, base] = await Promise.all([
+      showRef(':2'),
+      showRef(':3'),
+      showRef(':1'),
+    ]);
+
+    // Fallback to branch refs if stages are unavailable
+    if (!local || !remote) {
+      const [headLocal, mergeRemote] = await Promise.all([
+        showRef('HEAD'),
+        showRef('MERGE_HEAD'),
+      ]);
+      if (!local && headLocal) local = headLocal;
+      if (!remote && mergeRemote) remote = mergeRemote;
+
+      if (!base) {
+        try {
+          const mergeBase = (await git.raw(['merge-base', 'HEAD', 'MERGE_HEAD'])).trim();
+          if (mergeBase) base = await showRef(mergeBase);
+        } catch { /* no merge base available */ }
+      }
+    }
+
+    if (!local && !remote) {
+      console.warn('fetchGitSideVersions: could not load ours/theirs for', relPath);
+      return null;
+    }
+
+    console.log(`fetchGitSideVersions: loaded for ${relPath} (base: ${base.length}b, local: ${local.length}b, remote: ${remote.length}b)`);
+    return { local, remote, base };
+  } catch (error) {
+    console.warn('fetchGitSideVersions failed:', error);
+    return null;
+  }
+}
+
+/**
+ * Compute conflict ranges by finding which lines in the full side content
+ * correspond to each conflict block's ours/theirs content.
+ */
+function computeRangesFromContent(
+  fullContent: string,
+  blocks: ConflictBlock[],
+  side: 'ours' | 'theirs'
+): Array<{ start: number; end: number }> {
+  const fullLines = fullContent.split('\n');
+  const ranges: Array<{ start: number; end: number }> = [];
+  let searchFrom = 0;
+
+  for (const block of blocks) {
+    const conflictLines = (side === 'ours' ? block.ours.content : block.theirs.content).split('\n');
+    if (conflictLines.length === 0 || (conflictLines.length === 1 && conflictLines[0] === '')) {
+      // Empty conflict content — use a zero-width range that won't highlight anything
+      ranges.push({ start: 0, end: 0 });
+      continue;
+    }
+
+    // Find the first line of this conflict in fullContent starting from searchFrom
+    let foundAt = -1;
+    for (let i = searchFrom; i <= fullLines.length - conflictLines.length; i++) {
+      if (fullLines[i].trim() === conflictLines[0].trim()) {
+        // Check if all conflict lines match
+        let allMatch = true;
+        for (let j = 1; j < conflictLines.length; j++) {
+          if (fullLines[i + j]?.trim() !== conflictLines[j].trim()) {
+            allMatch = false;
+            break;
+          }
+        }
+        if (allMatch) {
+          foundAt = i;
+          break;
+        }
+      }
+    }
+
+    if (foundAt >= 0) {
+      ranges.push({
+        start: foundAt + 1,  // 1-indexed
+        end: foundAt + conflictLines.length,
+      });
+      searchFrom = foundAt + conflictLines.length;
+    } else {
+      // Content not found in full file — use zero-width range (no highlight)
+      ranges.push({ start: 0, end: 0 });
+    }
+  }
+
+  return ranges;
 }
 
 function buildSideViews(mergedContent: string): SideViews {
@@ -217,15 +335,57 @@ export class GuiSession {
     const ticketProvider = createProvider({ provider: providerName });
 
     const originalMergedContent = fs.readFileSync(args.merged, 'utf-8');
-    const sideViews = buildSideViews(originalMergedContent);
-    const sourceBlocks = await buildConflictBlocks(args.merged, ticketProvider, args.base);
+
+    // Try to get the real LOCAL/REMOTE/BASE from git's staging area
+    const gitVersions = await fetchGitSideVersions(args.merged);
+
+    let localFullContent: string;
+    let remoteFullContent: string;
+    let basePath = args.base;
+
+    if (gitVersions) {
+      localFullContent = gitVersions.local;
+      remoteFullContent = gitVersions.remote;
+      // Write base to a temp path for buildConflictBlocks if it needs it
+      if (gitVersions.base) {
+        const tmpBase = args.merged + '.base.tmp';
+        fs.writeFileSync(tmpBase, gitVersions.base, 'utf-8');
+        basePath = tmpBase;
+      }
+    } else {
+      // Fallback: reconstruct from conflict markers
+      const sideViews = buildSideViews(originalMergedContent);
+      localFullContent = sideViews.localContent;
+      remoteFullContent = sideViews.remoteContent;
+    }
+
+    const sourceBlocks = await buildConflictBlocks(args.merged, ticketProvider, basePath);
+
+    // Clean up temp base file
+    if (gitVersions?.base) {
+      try { fs.unlinkSync(args.merged + '.base.tmp'); } catch { /* ignore */ }
+    }
+
+    // Compute ranges: find where each conflict's content appears in the real files
+    let localRanges: Array<{ start: number; end: number }>;
+    let remoteRanges: Array<{ start: number; end: number }>;
+
+    if (gitVersions) {
+      localRanges = computeRangesFromContent(localFullContent, sourceBlocks, 'ours');
+      remoteRanges = computeRangesFromContent(remoteFullContent, sourceBlocks, 'theirs');
+    } else {
+      const sideViews = buildSideViews(originalMergedContent);
+      localRanges = sideViews.ranges.map((r) => r.localRange);
+      remoteRanges = sideViews.ranges.map((r) => r.remoteRange);
+    }
+
     const blocks = sourceBlocks.map((block, index) => ({
       id: `conflict-${index + 1}`,
       index,
       range: block.range,
-      localRange: sideViews.ranges[index]?.localRange ?? { start: 1, end: 1 },
-      remoteRange: sideViews.ranges[index]?.remoteRange ?? { start: 1, end: 1 },
-      previewRange: sideViews.ranges[index]?.localRange ?? { start: 1, end: 1 },
+      localRange: localRanges[index] ?? { start: 1, end: 1 },
+      remoteRange: remoteRanges[index] ?? { start: 1, end: 1 },
+      previewRange: localRanges[index] ?? { start: 1, end: 1 },
       ours: block.ours.content,
       theirs: block.theirs.content,
       aiResult: '',
@@ -239,8 +399,8 @@ export class GuiSession {
     return new GuiSession({
       args,
       originalMergedContent,
-      localFullContent: sideViews.localContent,
-      remoteFullContent: sideViews.remoteContent,
+      localFullContent,
+      remoteFullContent,
       sourceBlocks,
       blocks,
       currentIndex: 0,
