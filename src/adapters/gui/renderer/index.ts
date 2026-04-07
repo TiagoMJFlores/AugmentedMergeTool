@@ -253,11 +253,20 @@ function scrollActiveLineToCenter(container: HTMLElement | null, instant = false
   }
 }
 
+let sidebarInitialized = false;
+
 function renderFileSidebar(multiFile: GuiMultiFileState | null): void {
   if (!multiFile) {
     if (fileSidebar) fileSidebar.classList.add('hidden');
     if (sidebarToggle) sidebarToggle.classList.add('hidden');
     return;
+  }
+
+  // Open sidebar by default on first render
+  if (!sidebarInitialized) {
+    sidebarInitialized = true;
+    if (fileSidebar) fileSidebar.classList.remove('hidden');
+    if (sidebarToggle) sidebarToggle.classList.add('hidden');
   }
 
   // Show toggle button when sidebar is closed, hide when open
