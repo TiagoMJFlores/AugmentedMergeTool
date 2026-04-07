@@ -71,7 +71,6 @@ if (!resultEditor) {
 }
 
 let state: GuiSessionState | null = null;
-let syncingScroll = false;
 let hasManualResultEdits = false;
 let centerResultOnNextRender = false;
 
@@ -93,16 +92,23 @@ function computeHighlightRange(
   return { start: clampedStart, end: clampedEnd };
 }
 
+interface ConflictDiffInfo {
+  range: { start: number; end: number };
+  oppositeLines: Set<string>;
+}
+
 function renderCodePane(
   container: HTMLElement | null,
   content: string,
   oppositeContent: string,
-  activeRange: { start: number; end: number }
+  activeRange: { start: number; end: number },
+  conflictDiffs: ConflictDiffInfo[]
 ): void {
   if (!container) return;
 
   const lines = content.split('\n');
   const oppositeLines = oppositeContent.split('\n');
+  const oppositeSet = new Set(oppositeLines.map((l) => l.trim()));
   const fragment = document.createDocumentFragment();
 
   for (let index = 0; index < lines.length; index++) {
@@ -110,11 +116,28 @@ function renderCodePane(
     const lineElement = document.createElement('div');
     lineElement.className = 'code-line';
     lineElement.dataset.line = String(lineNumber);
-    if ((oppositeLines[index] ?? '') !== (lines[index] ?? '')) {
+    const trimmed = (lines[index] ?? '').trim();
+
+    // Find which conflict range this line belongs to (if any)
+    const conflict = conflictDiffs.find(
+      (c) => lineNumber >= c.range.start && lineNumber <= c.range.end
+    );
+
+    const isGenuineDiff = conflict
+      ? !conflict.oppositeLines.has(trimmed)  // inside conflict: differs from opposite side's conflict content
+      : (trimmed !== '' && !oppositeSet.has(trimmed));  // outside conflict: not in opposite file at all
+
+    const isInActiveRange = lineNumber >= activeRange.start && lineNumber <= activeRange.end;
+
+    if (conflict && isGenuineDiff) {
       lineElement.classList.add('diff-line');
-    }
-    if (lineNumber >= activeRange.start && lineNumber <= activeRange.end) {
-      lineElement.classList.add('active-line');
+      if (isInActiveRange) lineElement.classList.add('active-line');
+    } else if (conflict && !isGenuineDiff) {
+      // Identical line inside a conflict block — grey match highlight
+      lineElement.classList.add('match-line');
+      if (isInActiveRange) lineElement.classList.add('active-match-line');
+    } else if (!conflict && isGenuineDiff) {
+      lineElement.classList.add('change-line');
     }
     lineElement.textContent = lines[index] ?? '';
     fragment.appendChild(lineElement);
@@ -225,20 +248,10 @@ function renderConflictArrows(nextState: GuiSessionState): void {
   conflictGutter.replaceChildren(gutterInner);
 }
 
-function syncPaneScroll(source: HTMLElement): void {
-  if (syncingScroll) return;
-  syncingScroll = true;
-  const top = source.scrollTop;
-  if (localPane && source !== localPane) {
-    localPane.scrollTop = top;
+function syncGutterToLocal(): void {
+  if (conflictGutter && localPane) {
+    conflictGutter.scrollTop = localPane.scrollTop;
   }
-  if (remotePane && source !== remotePane) {
-    remotePane.scrollTop = top;
-  }
-  if (conflictGutter) {
-    conflictGutter.scrollTop = top;
-  }
-  syncingScroll = false;
 }
 
 function scrollActiveLineToCenter(container: HTMLElement | null, instant = false): void {
@@ -348,8 +361,9 @@ function render(nextState: GuiSessionState): void {
     }
     if (progress) progress.textContent = `0 / 0 \u2022 ${mergedPathLabel}`;
     if (conflictIndicator) conflictIndicator.textContent = '';
-    renderCodePane(localPane, '', '', { start: 0, end: 0 });
-    renderCodePane(remotePane, '', '', { start: 0, end: 0 });
+    renderCodePane(localPane, '', '', { start: 0, end: 0 }, []);
+    renderCodePane(remotePane, '', '', { start: 0, end: 0 }, []);
+
     renderResultPane(resultEditor, '', -1, [], { start: 0, end: 0 });
     if (conflictGutter) {
       conflictGutter.replaceChildren();
@@ -370,8 +384,18 @@ function render(nextState: GuiSessionState): void {
     conflictIndicator.textContent = `${idx + 1} / ${nextState.total}`;
   }
 
-  renderCodePane(localPane, nextState.localFullContent, nextState.remoteFullContent, block.localRange);
-  renderCodePane(remotePane, nextState.remoteFullContent, nextState.localFullContent, block.remoteRange);
+  // Build diff info: for each conflict, collect the opposite side's lines
+  // so we can avoid highlighting lines that are identical in both sides
+  const localDiffs: ConflictDiffInfo[] = nextState.blocks.map((b) => ({
+    range: b.localRange,
+    oppositeLines: new Set(b.theirs.split('\n').map((l) => l.trim())),
+  }));
+  const remoteDiffs: ConflictDiffInfo[] = nextState.blocks.map((b) => ({
+    range: b.remoteRange,
+    oppositeLines: new Set(b.ours.split('\n').map((l) => l.trim())),
+  }));
+  renderCodePane(localPane, nextState.localFullContent, nextState.remoteFullContent, block.localRange, localDiffs);
+  renderCodePane(remotePane, nextState.remoteFullContent, nextState.localFullContent, block.remoteRange, remoteDiffs);
   renderResultPane(
     resultEditor,
     nextState.previewContent,
@@ -414,12 +438,9 @@ function render(nextState: GuiSessionState): void {
         resultEditor.scrollTop = targetTop;
       }
     }
-    // Sync gutter after all panes have scrolled instantly
-    if (conflictGutter && localPane) {
-      conflictGutter.scrollTop = localPane.scrollTop;
-    }
-  } else if (localPane) {
-    queueMicrotask(() => syncPaneScroll(localPane));
+    syncGutterToLocal();
+  } else {
+    syncGutterToLocal();
   }
 }
 
@@ -468,8 +489,7 @@ function wireActions(): void {
     render(await window.mergeGuiApi.applyResolution({ conflictIndex: current.currentIndex, mode }));
   });
 
-  localPane?.addEventListener('scroll', () => syncPaneScroll(localPane));
-  remotePane?.addEventListener('scroll', () => syncPaneScroll(remotePane));
+  localPane?.addEventListener('scroll', () => syncGutterToLocal());
   finishButton?.addEventListener('click', async () => {
     await window.mergeGuiApi.finish(resultEditor?.value);
     // In multi-file mode, finish doesn't exit — it switches to next file
