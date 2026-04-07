@@ -129,15 +129,12 @@ function renderCodePane(
 
     const isInActiveRange = lineNumber >= activeRange.start && lineNumber <= activeRange.end;
 
-    if (conflict && isGenuineDiff) {
-      lineElement.classList.add('diff-line');
-      if (isInActiveRange) lineElement.classList.add('active-line');
-    } else if (conflict && !isGenuineDiff) {
-      // Identical line inside a conflict block — grey match highlight
-      lineElement.classList.add('match-line');
-      if (isInActiveRange) lineElement.classList.add('active-match-line');
-    } else if (!conflict && isGenuineDiff) {
-      lineElement.classList.add('change-line');
+    if (isGenuineDiff) {
+      if (isInActiveRange) {
+        lineElement.classList.add('active-line');
+      } else {
+        lineElement.classList.add(conflict ? 'diff-line' : 'change-line');
+      }
     }
     lineElement.textContent = lines[index] ?? '';
     fragment.appendChild(lineElement);
@@ -519,7 +516,7 @@ function wireActions(): void {
     if (!current) return;
     const block = current.blocks[current.currentIndex];
     if (!block) return;
-    renderResultPane(resultEditor, resultEditor.value, current.currentIndex, [], block.previewRange);
+    renderResultPane(resultEditor, resultEditor.value, current.currentIndex, current.previewLineOwners, block.previewRange);
   });
 
   sidebarToggle?.addEventListener('click', () => {
