@@ -11,57 +11,73 @@
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
-    <header>
-      <div id="progress"></div>
-    </header>
-
-    <main>
-      <nav class="conflict-nav">
-        <button id="prev-btn" title="Previous conflict">Previous</button>
-        <span id="conflict-indicator"></span>
-        <button id="next-btn" title="Next conflict">Next</button>
-        <button id="resolve-btn">Regenerate AI</button>
-        <button id="finish-btn">Write MERGED & Exit</button>
-      </nav>
-
-      <section class="top-grid">
-        <article>
-          <h2>LOCAL (HEAD)</h2>
-          <div id="local-content" class="code-pane" aria-label="Local file content"></div>
-        </article>
-        <article class="middle-controls">
-          <div id="conflict-gutter" class="conflict-gutter" aria-label="Conflict selectors"></div>
-        </article>
-        <article>
-          <h2>REMOTE (incoming)</h2>
-          <div id="remote-content" class="code-pane" aria-label="Remote file content"></div>
-        </article>
-      </section>
-
-      <section class="result">
-        <div class="result-header">
-          <div id="explanation-label" class="explanation-label"></div>
+    <div class="app-layout">
+      <button id="sidebar-toggle" class="sidebar-toggle hidden" title="Toggle file list">&#x2630;</button>
+      <aside id="file-sidebar" class="file-sidebar hidden">
+        <div class="sidebar-header">
+          <h3>Conflicted Files</h3>
+          <button id="sidebar-close" class="sidebar-close" title="Close file list">&times;</button>
         </div>
-        <p id="explanation"></p>
-        <div class="result-wrapper">
-          <div id="result-highlight" class="result-highlight" aria-hidden="true"></div>
-          <textarea id="result-editor" class="result-editor" aria-label="Editable final merged content"></textarea>
+        <ul id="file-list" class="file-list"></ul>
+        <div class="sidebar-footer">
+          <button id="finish-all-btn" class="finish-all-btn" disabled>Save Resolved & Exit</button>
         </div>
-      </section>
+      </aside>
 
-      <section class="actions-panel">
-        <label for="actions-select">Actions</label>
-        <select id="actions-select">
-          <option value="choose-ai">Choose AI solution</option>
-          <option value="choose-left">Choose left</option>
-          <option value="choose-right">Choose right</option>
-          <option value="choose-both-left-first">Choose both (left first)</option>
-          <option value="choose-both-right-first">Choose both (right first)</option>
-        </select>
-      </section>
+      <div class="main-wrapper">
+        <header>
+          <div id="progress"></div>
+        </header>
 
-      <p id="status"></p>
-    </main>
+        <main>
+          <nav class="conflict-nav">
+            <button id="prev-btn" title="Previous conflict">Previous</button>
+            <span id="conflict-indicator"></span>
+            <button id="next-btn" title="Next conflict">Next</button>
+            <button id="resolve-btn">Regenerate AI</button>
+            <button id="finish-btn">Resolve File</button>
+          </nav>
+
+          <section class="top-grid">
+            <article>
+              <h2>LOCAL (HEAD)</h2>
+              <div id="local-content" class="code-pane" aria-label="Local file content"></div>
+            </article>
+            <article class="middle-controls">
+              <div id="conflict-gutter" class="conflict-gutter" aria-label="Conflict selectors"></div>
+            </article>
+            <article>
+              <h2>REMOTE (incoming)</h2>
+              <div id="remote-content" class="code-pane" aria-label="Remote file content"></div>
+            </article>
+          </section>
+
+          <section class="result">
+            <div class="result-header">
+              <div id="explanation-label" class="explanation-label"></div>
+            </div>
+            <p id="explanation"></p>
+            <div class="result-wrapper">
+              <div id="result-highlight" class="result-highlight" aria-hidden="true"></div>
+              <textarea id="result-editor" class="result-editor" aria-label="Editable final merged content"></textarea>
+            </div>
+          </section>
+
+          <section class="actions-panel">
+            <label for="actions-select">Actions</label>
+            <select id="actions-select">
+              <option value="choose-ai">Choose AI solution</option>
+              <option value="choose-left">Choose left</option>
+              <option value="choose-right">Choose right</option>
+              <option value="choose-both-left-first">Choose both (left first)</option>
+              <option value="choose-both-right-first">Choose both (right first)</option>
+            </select>
+          </section>
+
+          <p id="status"></p>
+        </main>
+      </div>
+    </div>
 
     <script src="./cjs-shim.js"></script>
     <script src="./index.js"></script>

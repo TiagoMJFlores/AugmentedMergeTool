@@ -21,6 +21,17 @@ interface GuiConflictBlock {
     | null;
 }
 
+interface GuiFileEntry {
+  path: string;
+  conflictCount: number;
+  allResolved: boolean;
+}
+
+interface GuiMultiFileState {
+  files: GuiFileEntry[];
+  activeFilePath: string;
+}
+
 interface GuiSessionState {
   mergedPath: string;
   total: number;
@@ -31,6 +42,7 @@ interface GuiSessionState {
   previewContent: string;
   previewLineOwners: number[];
   blocks: GuiConflictBlock[];
+  multiFile: GuiMultiFileState | null;
 }
 
 const progress = document.getElementById('progress');
@@ -48,6 +60,11 @@ const resolveButton = document.getElementById('resolve-btn') as HTMLButtonElemen
 const finishButton = document.getElementById('finish-btn') as HTMLButtonElement | null;
 const resultEditor = document.getElementById('result-editor') as HTMLTextAreaElement | null;
 const resultHighlight = document.getElementById('result-highlight');
+const fileSidebar = document.getElementById('file-sidebar');
+const fileList = document.getElementById('file-list');
+const sidebarToggle = document.getElementById('sidebar-toggle');
+const sidebarClose = document.getElementById('sidebar-close');
+const finishAllButton = document.getElementById('finish-all-btn') as HTMLButtonElement | null;
 
 if (!resultEditor) {
   throw new Error('result editor not found');
@@ -236,6 +253,83 @@ function scrollActiveLineToCenter(container: HTMLElement | null, instant = false
   }
 }
 
+let sidebarInitialized = false;
+
+function renderFileSidebar(multiFile: GuiMultiFileState | null): void {
+  if (!multiFile) {
+    if (fileSidebar) fileSidebar.classList.add('hidden');
+    if (sidebarToggle) sidebarToggle.classList.add('hidden');
+    return;
+  }
+
+  // Open sidebar by default on first render
+  if (!sidebarInitialized) {
+    sidebarInitialized = true;
+    if (fileSidebar) fileSidebar.classList.remove('hidden');
+    if (sidebarToggle) sidebarToggle.classList.add('hidden');
+  }
+
+  // Show toggle button when sidebar is closed, hide when open
+  const sidebarOpen = fileSidebar && !fileSidebar.classList.contains('hidden');
+  if (sidebarToggle) {
+    sidebarToggle.classList.toggle('hidden', !!sidebarOpen);
+  }
+  if (!fileList) return;
+
+  const fragment = document.createDocumentFragment();
+
+  for (const file of multiFile.files) {
+    const li = document.createElement('li');
+    li.className = 'file-entry';
+    if (file.path === multiFile.activeFilePath) li.classList.add('active');
+    if (file.allResolved) li.classList.add('resolved');
+
+    const indicator = document.createElement('span');
+    indicator.className = 'file-entry-indicator';
+    li.appendChild(indicator);
+
+    const name = document.createElement('span');
+    name.className = 'file-entry-name';
+    name.textContent = file.path;
+    name.title = file.path;
+    li.appendChild(name);
+
+    const badge = document.createElement('span');
+    badge.className = 'file-entry-badge';
+    badge.textContent = file.allResolved ? 'Done' : `${file.conflictCount}`;
+    li.appendChild(badge);
+
+    li.addEventListener('click', async () => {
+      hasManualResultEdits = false;
+      centerResultOnNextRender = true;
+      if (status) status.textContent = 'Switching file...';
+      const newState = await window.mergeGuiApi.switchFile(file.path);
+      render(newState);
+      // Generate AI for new file if needed
+      if (newState.total > 0 && newState.blocks.some((b) => !b.aiResult)) {
+        if (status) status.textContent = `Generating AI suggestions for ${newState.total} conflict(s)...`;
+        try {
+          render(await window.mergeGuiApi.generateAllAiResolutions());
+          if (status) status.textContent = 'All AI suggestions ready.';
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          if (status) status.textContent = `Could not generate AI suggestions: ${message}`;
+        }
+      }
+    });
+
+    fragment.appendChild(li);
+  }
+
+  fileList.replaceChildren(fragment);
+
+  // Enable "Write All & Exit" when at least one file is resolved
+  if (finishAllButton) {
+    const anyResolved = multiFile.files.some((f) => f.allResolved);
+    finishAllButton.disabled = !anyResolved;
+  }
+}
+
 function assertState(): GuiSessionState {
   if (!state) {
     throw new Error('State not loaded');
@@ -245,6 +339,7 @@ function assertState(): GuiSessionState {
 
 function render(nextState: GuiSessionState): void {
   state = nextState;
+  renderFileSidebar(nextState.multiFile);
   const mergedPathLabel = nextState.mergedPath;
 
   if (nextState.total === 0) {
@@ -377,6 +472,18 @@ function wireActions(): void {
   remotePane?.addEventListener('scroll', () => syncPaneScroll(remotePane));
   finishButton?.addEventListener('click', async () => {
     await window.mergeGuiApi.finish(resultEditor?.value);
+    // In multi-file mode, finish doesn't exit — it switches to next file
+    if (state?.multiFile) {
+      hasManualResultEdits = false;
+      centerResultOnNextRender = true;
+      const newState = await window.mergeGuiApi.getState();
+      render(newState);
+      if (newState.total > 0 && newState.blocks.some((b) => !b.aiResult)) {
+        try {
+          render(await window.mergeGuiApi.generateAllAiResolutions());
+        } catch { /* handled in render */ }
+      }
+    }
   });
 
   resultEditor?.addEventListener('scroll', () => {
@@ -393,6 +500,20 @@ function wireActions(): void {
     const block = current.blocks[current.currentIndex];
     if (!block) return;
     renderResultPane(resultEditor, resultEditor.value, current.currentIndex, [], block.previewRange);
+  });
+
+  sidebarToggle?.addEventListener('click', () => {
+    if (fileSidebar) fileSidebar.classList.remove('hidden');
+    if (sidebarToggle) sidebarToggle.classList.add('hidden');
+  });
+
+  sidebarClose?.addEventListener('click', () => {
+    if (fileSidebar) fileSidebar.classList.add('hidden');
+    if (sidebarToggle) sidebarToggle.classList.remove('hidden');
+  });
+
+  finishAllButton?.addEventListener('click', async () => {
+    await window.mergeGuiApi.finishAll();
   });
 }
 

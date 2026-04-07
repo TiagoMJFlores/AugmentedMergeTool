@@ -28,6 +28,17 @@ export interface GuiConflictBlock {
     | null;
 }
 
+export interface GuiFileEntry {
+  path: string;
+  conflictCount: number;
+  allResolved: boolean;
+}
+
+export interface GuiMultiFileState {
+  files: GuiFileEntry[];
+  activeFilePath: string;
+}
+
 export interface GuiSessionState {
   mergedPath: string;
   total: number;
@@ -38,6 +49,7 @@ export interface GuiSessionState {
   previewContent: string;
   previewLineOwners: number[];
   blocks: GuiConflictBlock[];
+  multiFile: GuiMultiFileState | null;
 }
 
 export type ResolutionMode =
@@ -64,4 +76,6 @@ export interface RendererApi {
   applyResolution: (input: ApplyResolutionInput) => Promise<GuiSessionState>;
   navigateTo: (index: number) => Promise<GuiSessionState>;
   finish: (finalContent?: string) => Promise<void>;
+  switchFile: (filePath: string) => Promise<GuiSessionState>;
+  finishAll: () => Promise<void>;
 }

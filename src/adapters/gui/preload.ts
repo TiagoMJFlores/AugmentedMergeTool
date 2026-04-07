@@ -8,6 +8,8 @@ const api: RendererApi = {
   applyResolution: (input) => ipcRenderer.invoke('gui:apply', input),
   navigateTo: (index) => ipcRenderer.invoke('gui:navigate', index),
   finish: (finalContent) => ipcRenderer.invoke('gui:finish', finalContent),
+  switchFile: (filePath) => ipcRenderer.invoke('gui:switch-file', filePath),
+  finishAll: () => ipcRenderer.invoke('gui:finish-all'),
 };
 
 contextBridge.exposeInMainWorld('mergeGuiApi', api);

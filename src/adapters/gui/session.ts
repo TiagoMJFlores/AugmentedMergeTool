@@ -356,6 +356,7 @@ export class GuiSession {
       previewContent: preview.content,
       previewLineOwners: preview.lineOwners,
       blocks: this.data.blocks,
+      multiFile: null,
     };
   }
 }
