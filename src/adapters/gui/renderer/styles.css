@@ -308,32 +308,16 @@ main {
   content: '\00a0';
 }
 
-.diff-line {
-  background: rgba(59, 130, 246, 0.2);
-}
-
-/* Auto-resolved changes: lines that differ between LOCAL/REMOTE but are
-   outside conflict markers (git resolved them automatically). Subtle
-   style to distinguish from actual conflicts. */
+/* Lines that differ — inactive conflicts and auto-resolved changes */
+.diff-line,
 .change-line {
-  background: rgba(139, 92, 246, 0.12);
-  border-left: 2px solid rgba(139, 92, 246, 0.4);
+  background: rgba(250, 204, 21, 0.12);
 }
 
+/* Lines that differ — active conflict (the one being edited) */
 .active-line {
-  background: rgba(239, 68, 68, 0.22);
+  background: rgba(239, 68, 68, 0.25);
   border-left: 2px solid #ef4444;
-}
-
-/* Identical lines inside a conflict block — grey to show the block boundary */
-.match-line {
-  background: rgba(148, 163, 184, 0.08);
-}
-
-/* Identical lines inside the ACTIVE conflict block — slightly stronger grey */
-.active-match-line {
-  background: rgba(148, 163, 184, 0.15);
-  border-left: 2px solid rgba(148, 163, 184, 0.3);
 }
 
 .middle-controls {
@@ -464,15 +448,12 @@ main {
 }
 
 .conflict-line {
-  background: rgba(245, 158, 11, 0.18);
-  border-left: 2px solid rgba(245, 158, 11, 0.5);
+  background: rgba(250, 204, 21, 0.12);
 }
 
 .result .active-line {
-  background: rgba(220, 38, 38, 0.42) !important;
+  background: rgba(239, 68, 68, 0.25) !important;
   border-left: 3px solid #ef4444;
-  /* Do NOT set color here — the highlight overlay must keep text transparent
-     so it doesn't clash with the textarea text layer on top. */
 }
 
 .result {
