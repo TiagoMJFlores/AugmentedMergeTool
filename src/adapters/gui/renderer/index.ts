@@ -308,10 +308,10 @@ function renderFileSidebar(multiFile: GuiMultiFileState | null): void {
 
   fileList.replaceChildren(fragment);
 
-  // Update "Write All & Exit" button
+  // Enable "Write All & Exit" when at least one file is resolved
   if (finishAllButton) {
-    const allDone = multiFile.files.every((f) => f.allResolved);
-    finishAllButton.disabled = !allDone;
+    const anyResolved = multiFile.files.some((f) => f.allResolved);
+    finishAllButton.disabled = !anyResolved;
   }
 }
 

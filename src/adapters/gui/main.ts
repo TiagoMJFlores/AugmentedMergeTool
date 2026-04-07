@@ -145,6 +145,7 @@ ipcMain.handle('gui:switch-file', async (_event, filePath: string) => {
 });
 
 ipcMain.handle('gui:finish-all', async () => {
+  // Write all resolved files and exit — unresolved files are left as-is
   for (const [, session] of sessions) {
     if (session.getState().complete) {
       session.finish();
