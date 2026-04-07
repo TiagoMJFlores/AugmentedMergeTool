@@ -4,7 +4,7 @@ import { app, BrowserWindow, ipcMain } from 'electron';
 import simpleGit from 'simple-git';
 import { GuiSession } from './session.js';
 import type { ApplyResolutionInput, GuiSessionState, GuiMultiFileState, ResolveAndStoreInput } from './contracts.js';
-import { parseMergeToolArgs } from './args.js';
+import { parseMergeToolArgs, type ParsedArgs } from './args.js';
 
 let activeSession: GuiSession | null = null;
 const sessions = new Map<string, GuiSession>();
@@ -55,14 +55,14 @@ async function createMainWindow(): Promise<void> {
 
 app.whenReady().then(async () => {
   try {
-    const args = parseMergeToolArgs(process.argv.slice(2));
+    const parsed = parseMergeToolArgs(process.argv.slice(2));
 
-    if (args) {
-      // Single-file mode — explicit path provided
-      activeSession = await GuiSession.create(args);
+    if (parsed.mode === 'single-file') {
+      activeSession = await GuiSession.create(parsed.args);
     } else {
       // Multi-file mode — auto-detect from git status
-      const git = simpleGit(process.cwd());
+      const repoDir = parsed.repoDir;
+      const git = simpleGit(repoDir);
       const status = await git.status();
       const conflictedFiles = status.conflicted;
 
@@ -75,7 +75,7 @@ app.whenReady().then(async () => {
       multiFileMode = true;
 
       for (const relPath of conflictedFiles) {
-        const absPath = path.resolve(process.cwd(), relPath);
+        const absPath = path.resolve(repoDir, relPath);
         const session = await GuiSession.create({
           local: absPath,
           base: absPath,
