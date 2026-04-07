@@ -519,7 +519,7 @@ function wireActions(): void {
     if (!current) return;
     const block = current.blocks[current.currentIndex];
     if (!block) return;
-    renderResultPane(resultEditor, resultEditor.value, current.currentIndex, [], block.previewRange);
+    renderResultPane(resultEditor, resultEditor.value, current.currentIndex, current.previewLineOwners, block.previewRange);
   });
 
   sidebarToggle?.addEventListener('click', () => {
