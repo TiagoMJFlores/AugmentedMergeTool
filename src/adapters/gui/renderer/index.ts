@@ -63,6 +63,7 @@ const resultHighlight = document.getElementById('result-highlight');
 const fileSidebar = document.getElementById('file-sidebar');
 const fileList = document.getElementById('file-list');
 const sidebarToggle = document.getElementById('sidebar-toggle');
+const sidebarClose = document.getElementById('sidebar-close');
 const finishAllButton = document.getElementById('finish-all-btn') as HTMLButtonElement | null;
 
 if (!resultEditor) {
@@ -255,10 +256,15 @@ function scrollActiveLineToCenter(container: HTMLElement | null, instant = false
 function renderFileSidebar(multiFile: GuiMultiFileState | null): void {
   if (!multiFile) {
     if (fileSidebar) fileSidebar.classList.add('hidden');
+    if (sidebarToggle) sidebarToggle.classList.add('hidden');
     return;
   }
 
-  if (fileSidebar) fileSidebar.classList.remove('hidden');
+  // Show toggle button when sidebar is closed, hide when open
+  const sidebarOpen = fileSidebar && !fileSidebar.classList.contains('hidden');
+  if (sidebarToggle) {
+    sidebarToggle.classList.toggle('hidden', !!sidebarOpen);
+  }
   if (!fileList) return;
 
   const fragment = document.createDocumentFragment();
@@ -488,7 +494,13 @@ function wireActions(): void {
   });
 
   sidebarToggle?.addEventListener('click', () => {
-    if (fileSidebar) fileSidebar.classList.toggle('hidden');
+    if (fileSidebar) fileSidebar.classList.remove('hidden');
+    if (sidebarToggle) sidebarToggle.classList.add('hidden');
+  });
+
+  sidebarClose?.addEventListener('click', () => {
+    if (fileSidebar) fileSidebar.classList.add('hidden');
+    if (sidebarToggle) sidebarToggle.classList.remove('hidden');
   });
 
   finishAllButton?.addEventListener('click', async () => {
