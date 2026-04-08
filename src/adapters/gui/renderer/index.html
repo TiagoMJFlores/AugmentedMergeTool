@@ -33,7 +33,10 @@
           <nav class="conflict-nav">
             <button id="prev-btn" title="Previous conflict">Previous</button>
             <span id="conflict-indicator"></span>
+            <span id="conflict-status" class="conflict-status"></span>
             <button id="next-btn" title="Next conflict">Next</button>
+            <span class="nav-spacer"></span>
+            <span id="resolve-progress" class="resolve-progress"></span>
             <button id="finish-btn">Resolve File</button>
           </nav>
 
@@ -60,6 +63,7 @@
           <section class="actions-panel">
             <label for="actions-select">Actions</label>
             <select id="actions-select">
+              <option value="" disabled selected>Select action...</option>
               <option value="choose-ai">Choose AI solution</option>
               <option value="choose-left">Choose left</option>
               <option value="choose-right">Choose right</option>
