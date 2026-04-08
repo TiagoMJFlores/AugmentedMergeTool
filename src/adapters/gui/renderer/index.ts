@@ -53,6 +53,8 @@ const explanation = document.getElementById('explanation');
 const explanationLabel = document.getElementById('explanation-label');
 const conflictIndicator = document.getElementById('conflict-indicator');
 const actionsSelect = document.getElementById('actions-select') as HTMLSelectElement | null;
+const conflictStatus = document.getElementById('conflict-status');
+const resolveProgress = document.getElementById('resolve-progress');
 const prevButton = document.getElementById('prev-btn') as HTMLButtonElement | null;
 const nextButton = document.getElementById('next-btn') as HTMLButtonElement | null;
 const finishButton = document.getElementById('finish-btn') as HTMLButtonElement | null;
@@ -397,7 +399,29 @@ function render(nextState: GuiSessionState): void {
 
   if (prevButton) prevButton.disabled = nextState.total === 0;
   if (nextButton) nextButton.disabled = nextState.total === 0;
-  if (finishButton) finishButton.disabled = !nextState.complete;
+  // Current conflict status badge
+  if (conflictStatus) {
+    if (block.actionTaken) {
+      conflictStatus.textContent = '✓';
+      conflictStatus.className = 'conflict-status resolved';
+    } else {
+      conflictStatus.textContent = 'pending';
+      conflictStatus.className = 'conflict-status pending';
+    }
+  }
+
+  // Overall resolve progress
+  const resolved = nextState.blocks.filter((b) => b.actionTaken).length;
+  const pending = nextState.total - resolved;
+
+  if (resolveProgress) {
+    resolveProgress.innerHTML = `<span class="progress-count">${resolved}</span> / ${nextState.total} resolved`;
+  }
+
+  if (finishButton) {
+    finishButton.disabled = pending > 0;
+    finishButton.textContent = pending > 0 ? `Resolve File (${pending} pending)` : 'Resolve File';
+  }
   renderConflictArrow(nextState);
 
   const navigating = centerResultOnNextRender;

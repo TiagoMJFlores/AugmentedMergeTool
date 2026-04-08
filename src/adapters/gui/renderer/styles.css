@@ -215,22 +215,53 @@ main {
 .conflict-nav {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 16px;
+  gap: 8px;
 }
 
 #conflict-indicator {
   display: inline-block;
-  min-width: 72px;
+  min-width: 52px;
   text-align: center;
   font-weight: 600;
-  font-size: 14px;
+  font-size: 13px;
   letter-spacing: 0.5px;
   color: #e2e8f0;
   background: #1e293b;
   border: 1px solid #334155;
   border-radius: 20px;
-  padding: 6px 18px;
+  padding: 4px 14px;
+}
+
+.conflict-status {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+.conflict-status.resolved {
+  background: #14532d;
+  color: #4ade80;
+}
+
+.conflict-status.pending {
+  background: #422006;
+  color: #fbbf24;
+}
+
+.nav-spacer {
+  flex: 1;
+}
+
+.resolve-progress {
+  font-size: 11px;
+  color: #64748b;
+  letter-spacing: 0.02em;
+}
+
+.resolve-progress .progress-count {
+  color: #4ade80;
+  font-weight: 600;
 }
 
 .pane-label {
