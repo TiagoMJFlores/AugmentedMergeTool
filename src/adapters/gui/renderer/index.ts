@@ -484,9 +484,15 @@ function wireActions(): void {
   });
 
   finishButton?.addEventListener('click', async () => {
-    await window.mergeGuiApi.finish(resultEditor?.value);
-    // In multi-file mode, finish doesn't exit — it switches to next file
+    console.log('Resolve File clicked');
+    try {
+      const logs = await window.mergeGuiApi.finish(resultEditor?.value);
+      console.log('finish() result:\n' + logs);
+    } catch (err) {
+      console.error('finish() failed:', err);
+    }
     if (state?.multiFile) {
+      // Multi-file: switch to next unresolved file
       hasManualResultEdits = false;
       centerResultOnNextRender = true;
       const newState = await window.mergeGuiApi.getState();
@@ -496,6 +502,11 @@ function wireActions(): void {
           render(await window.mergeGuiApi.generateAllAiResolutions());
         } catch { /* handled in render */ }
       }
+    } else {
+      // Single-file: show success, user closes window manually
+      if (explanation) explanation.textContent = 'File resolved and staged. You can close this window.';
+      if (finishButton) finishButton.disabled = true;
+      if (finishButton) finishButton.textContent = 'Done ✓';
     }
   });
 

@@ -45,9 +45,8 @@ async function createMainWindow(): Promise<void> {
     },
   });
 
-  const shouldOpenDevTools = process.env.MERGEAGENT_GUI_DEBUG === '1' || !app.isPackaged;
-  if (shouldOpenDevTools) {
-    mainWindow.webContents.openDevTools({ mode: 'detach' });
+  if (process.env.MERGEAGENT_GUI_DEBUG === '1') {
+    mainWindow.webContents.openDevTools({ mode: 'bottom' });
   }
 
   await mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'));
@@ -81,6 +80,7 @@ app.whenReady().then(async () => {
           base: absPath,
           remote: absPath,
           merged: absPath,
+          repoDir,
         });
         sessions.set(relPath, session);
       }
@@ -119,10 +119,9 @@ ipcMain.handle('gui:navigate', async (_event, index: number) => {
 
 ipcMain.handle('gui:finish', async (_event, finalContent?: string) => {
   const session = getActiveSession();
-  session.finish(finalContent);
+  await session.finish(finalContent);
 
   if (!multiFileMode) {
-    app.exit(0);
     return;
   }
 
@@ -130,11 +129,11 @@ ipcMain.handle('gui:finish', async (_event, finalContent?: string) => {
   for (const [, s] of sessions) {
     if (!s.getState().complete) {
       activeSession = s;
-      return;
+      return injectMultiFile(s.getState());
     }
   }
   // All done
-  app.exit(0);
+  setTimeout(() => app.quit(), 200);
 });
 
 ipcMain.handle('gui:switch-file', async (_event, filePath: string) => {
@@ -148,10 +147,10 @@ ipcMain.handle('gui:finish-all', async () => {
   // Write all resolved files and exit — unresolved files are left as-is
   for (const [, session] of sessions) {
     if (session.getState().complete) {
-      session.finish();
+      await session.finish();
     }
   }
-  app.exit(0);
+  setTimeout(() => app.quit(), 200);
 });
 
 app.on('window-all-closed', () => {
