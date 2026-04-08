@@ -207,7 +207,7 @@ function getNextMode(selectedSide: 'local' | 'remote' | 'both' | null): 'use-loc
 
 function updateActionButtons(block: GuiConflictBlock): void {
   if (actionsSelect) {
-    actionsSelect.value = block.selectedAction ?? 'choose-left';
+    actionsSelect.value = block.selectedAction ?? '';
   }
 }
 
