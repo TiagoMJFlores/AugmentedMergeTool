@@ -52,11 +52,11 @@ const conflictGutter = document.getElementById('conflict-gutter');
 const explanation = document.getElementById('explanation');
 const explanationLabel = document.getElementById('explanation-label');
 const conflictIndicator = document.getElementById('conflict-indicator');
-const status = document.getElementById('status');
 const actionsSelect = document.getElementById('actions-select') as HTMLSelectElement | null;
+const conflictStatus = document.getElementById('conflict-status');
+const resolveProgress = document.getElementById('resolve-progress');
 const prevButton = document.getElementById('prev-btn') as HTMLButtonElement | null;
 const nextButton = document.getElementById('next-btn') as HTMLButtonElement | null;
-const resolveButton = document.getElementById('resolve-btn') as HTMLButtonElement | null;
 const finishButton = document.getElementById('finish-btn') as HTMLButtonElement | null;
 const resultEditor = document.getElementById('result-editor') as HTMLTextAreaElement | null;
 const resultHighlight = document.getElementById('result-highlight');
@@ -207,48 +207,34 @@ function getNextMode(selectedSide: 'local' | 'remote' | 'both' | null): 'use-loc
 
 function updateActionButtons(block: GuiConflictBlock): void {
   if (actionsSelect) {
-    actionsSelect.value = block.selectedAction ?? 'choose-left';
+    actionsSelect.value = block.selectedAction ?? '';
   }
 }
 
-function renderConflictArrows(nextState: GuiSessionState): void {
-  if (!conflictGutter || !localPane) return;
-  const gutterInner = document.createElement('div');
-  gutterInner.className = 'conflict-gutter-inner';
-  gutterInner.style.height = `${localPane.scrollHeight}px`;
-  const firstLine = localPane.querySelector('.code-line') as HTMLElement | null;
-  const lineHeight =
-    firstLine?.getBoundingClientRect().height || Number.parseFloat(getComputedStyle(localPane).lineHeight) || 20;
+function renderConflictArrow(nextState: GuiSessionState): void {
+  if (!conflictGutter) return;
 
-  for (const block of nextState.blocks) {
-    const arrowButton = document.createElement('button');
-    arrowButton.className = `conflict-arrow${block.index === nextState.currentIndex ? ' active' : ''}`;
-    arrowButton.textContent = getArrowLabel(block.selectedSide);
-    arrowButton.title = `Conflict ${block.index + 1}: click to toggle selection direction`;
-    arrowButton.setAttribute('aria-label', `Conflict ${block.index + 1} selector`);
+  const block = nextState.blocks[nextState.currentIndex];
+  if (!block) {
+    conflictGutter.replaceChildren();
+    return;
+  }
 
-    const midpointLine = Math.floor((block.localRange.start + block.localRange.end) / 2);
-    const topOffset = Math.max(0, (midpointLine - 1) * lineHeight);
-    arrowButton.style.top = `${Math.max(0, topOffset)}px`;
-    arrowButton.addEventListener('click', async () => {
-      centerResultOnNextRender = true;
-      const navigatedState = await window.mergeGuiApi.navigateTo(block.index);
-      const updatedState = await window.mergeGuiApi.applyResolution({
-        conflictIndex: block.index,
-        mode: getNextMode(navigatedState.blocks[block.index]?.selectedSide ?? null),
-      });
-      render(updatedState);
+  const arrowButton = document.createElement('button');
+  arrowButton.className = 'conflict-arrow active';
+  arrowButton.textContent = getArrowLabel(block.selectedSide);
+  arrowButton.title = `Click to toggle selection direction`;
+  arrowButton.addEventListener('click', async () => {
+    centerResultOnNextRender = true;
+    const navigatedState = await window.mergeGuiApi.navigateTo(block.index);
+    const updatedState = await window.mergeGuiApi.applyResolution({
+      conflictIndex: block.index,
+      mode: getNextMode(navigatedState.blocks[block.index]?.selectedSide ?? null),
     });
-    gutterInner.appendChild(arrowButton);
-  }
+    render(updatedState);
+  });
 
-  conflictGutter.replaceChildren(gutterInner);
-}
-
-function syncGutterToLocal(): void {
-  if (conflictGutter && localPane) {
-    conflictGutter.scrollTop = localPane.scrollTop;
-  }
+  conflictGutter.replaceChildren(arrowButton);
 }
 
 function scrollActiveLineToCenter(container: HTMLElement | null, instant = false): void {
@@ -312,18 +298,18 @@ function renderFileSidebar(multiFile: GuiMultiFileState | null): void {
     li.addEventListener('click', async () => {
       hasManualResultEdits = false;
       centerResultOnNextRender = true;
-      if (status) status.textContent = 'Switching file...';
+      if (explanation) explanation.textContent = 'Analysing conflicts...';
       const newState = await window.mergeGuiApi.switchFile(file.path);
       render(newState);
       // Generate AI for new file if needed
       if (newState.total > 0 && newState.blocks.some((b) => !b.aiResult)) {
-        if (status) status.textContent = `Generating AI suggestions for ${newState.total} conflict(s)...`;
+        if (explanation) explanation.textContent = 'Analysing conflicts...';
         try {
           render(await window.mergeGuiApi.generateAllAiResolutions());
-          if (status) status.textContent = 'All AI suggestions ready.';
+          // explanation will be set per-conflict by render()
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
-          if (status) status.textContent = `Could not generate AI suggestions: ${message}`;
+          if (explanation) explanation.textContent = 'Something went wrong while analysing conflicts. Please check your API key and try again.';
         }
       }
     });
@@ -353,8 +339,8 @@ function render(nextState: GuiSessionState): void {
   const mergedPathLabel = nextState.mergedPath;
 
   if (nextState.total === 0) {
-    if (status) {
-      status.textContent = `No conflict markers found in MERGED file: ${nextState.mergedPath}`;
+    if (explanation) {
+      explanation.textContent = '';
     }
     if (progress) progress.textContent = `0 / 0 \u2022 ${mergedPathLabel}`;
     if (conflictIndicator) conflictIndicator.textContent = '';
@@ -365,7 +351,7 @@ function render(nextState: GuiSessionState): void {
     if (conflictGutter) {
       conflictGutter.replaceChildren();
     }
-    if (explanation) explanation.textContent = 'Open a file that still contains Git conflict markers.';
+    if (explanation) explanation.textContent = '';
     if (explanationLabel) explanationLabel.textContent = '';
     return;
   }
@@ -401,22 +387,42 @@ function render(nextState: GuiSessionState): void {
     block.previewRange
   );
 
-  if (explanationLabel) {
-    explanationLabel.textContent = `Conflict ${idx + 1} of ${nextState.total}`;
-  }
   if (explanation) {
-    explanation.textContent = block.explanation || 'Generating AI explanation...';
+    if (block.explanation) {
+      explanation.textContent = block.explanation;
+    } else if (!block.actionTaken) {
+      // Keep existing message (error or "Analysing...") — don't overwrite
+    }
   }
 
-  if (status) {
-    status.textContent = block.actionTaken ? 'AI resolution applied.' : 'Pending AI resolution...';
-  }
   updateActionButtons(block);
 
   if (prevButton) prevButton.disabled = nextState.total === 0;
   if (nextButton) nextButton.disabled = nextState.total === 0;
-  if (finishButton) finishButton.disabled = !nextState.complete;
-  renderConflictArrows(nextState);
+  // Current conflict status badge
+  if (conflictStatus) {
+    if (block.actionTaken) {
+      conflictStatus.textContent = '✓';
+      conflictStatus.className = 'conflict-status resolved';
+    } else {
+      conflictStatus.textContent = 'pending';
+      conflictStatus.className = 'conflict-status pending';
+    }
+  }
+
+  // Overall resolve progress
+  const resolved = nextState.blocks.filter((b) => b.actionTaken).length;
+  const pending = nextState.total - resolved;
+
+  if (resolveProgress) {
+    resolveProgress.innerHTML = `<span class="progress-count">${resolved}</span> / ${nextState.total} resolved`;
+  }
+
+  if (finishButton) {
+    finishButton.disabled = pending > 0;
+    finishButton.textContent = pending > 0 ? `Resolve File (${pending} pending)` : 'Resolve File';
+  }
+  renderConflictArrow(nextState);
 
   const navigating = centerResultOnNextRender;
   scrollActiveLineToCenter(localPane, navigating);
@@ -435,9 +441,6 @@ function render(nextState: GuiSessionState): void {
         resultEditor.scrollTop = targetTop;
       }
     }
-    syncGutterToLocal();
-  } else {
-    syncGutterToLocal();
   }
 }
 
@@ -463,12 +466,6 @@ function wireActions(): void {
     render(await window.mergeGuiApi.navigateTo(nextIndex));
   });
 
-  resolveButton?.addEventListener('click', async () => {
-    const current = assertState();
-    centerResultOnNextRender = true;
-    render(await window.mergeGuiApi.generateAiResolution({ conflictIndex: current.currentIndex }));
-  });
-
   actionsSelect?.addEventListener('change', async () => {
     const current = assertState();
     centerResultOnNextRender = true;
@@ -486,11 +483,16 @@ function wireActions(): void {
     render(await window.mergeGuiApi.applyResolution({ conflictIndex: current.currentIndex, mode }));
   });
 
-  localPane?.addEventListener('scroll', () => syncGutterToLocal());
   finishButton?.addEventListener('click', async () => {
-    await window.mergeGuiApi.finish(resultEditor?.value);
-    // In multi-file mode, finish doesn't exit — it switches to next file
+    console.log('Resolve File clicked');
+    try {
+      const logs = await window.mergeGuiApi.finish(resultEditor?.value);
+      console.log('finish() result:\n' + logs);
+    } catch (err) {
+      console.error('finish() failed:', err);
+    }
     if (state?.multiFile) {
+      // Multi-file: switch to next unresolved file
       hasManualResultEdits = false;
       centerResultOnNextRender = true;
       const newState = await window.mergeGuiApi.getState();
@@ -500,6 +502,11 @@ function wireActions(): void {
           render(await window.mergeGuiApi.generateAllAiResolutions());
         } catch { /* handled in render */ }
       }
+    } else {
+      // Single-file: show success, user closes window manually
+      if (explanation) explanation.textContent = 'File resolved and staged. You can close this window.';
+      if (finishButton) finishButton.disabled = true;
+      if (finishButton) finishButton.textContent = 'Done ✓';
     }
   });
 
@@ -545,27 +552,24 @@ async function init(): Promise<void> {
   const hasPending = current.blocks.some((block) => !block.aiResult);
   if (!hasPending) return;
 
-  if (status) {
-    status.textContent = `Generating AI suggestions for ${current.total} conflict(s)...`;
+  if (explanation) {
+    explanation.textContent = 'Analysing conflicts...';
   }
 
   try {
     render(await window.mergeGuiApi.generateAllAiResolutions());
-    if (status) {
-      status.textContent = 'All AI suggestions ready.';
-    }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    if (status) {
-      status.textContent = `Could not generate AI suggestions: ${message}`;
+    if (explanation) {
+      explanation.textContent = 'Something went wrong while analysing conflicts. Please check your API key and try again.';
     }
   }
 }
 
 void init().catch((error: unknown) => {
   const message = error instanceof Error ? error.message : String(error);
-  if (status) {
-    status.textContent = `Failed to initialize GUI: ${message}`;
+  if (explanation) {
+    explanation.textContent = 'Something went wrong while analysing conflicts. Please check your API key and try again.';
   }
   if (progress) {
     progress.textContent = 'Initialization error';

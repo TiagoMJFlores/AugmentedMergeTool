@@ -173,7 +173,12 @@ function buildPromptFromWindowed(windowed: ConflictBlock): string {
 
 Return ONLY a JSON object with exactly two fields:
 - "resolution": the resolved code with no conflict markers, no explanation, no markdown
-- "explanation": 2-3 sentences in plain English explaining what each side was trying to do and why your resolution makes sense. This will be rendered directly in the CLI output.
+- "explanation": a structured summary in exactly this format:
+  Ours: [what our side changed, e.g. "renamed completion → onCompletion and added postalCode parameter"]
+  Theirs: [what their side changed, e.g. "kept original signature, added guard for nil error"]
+  Resolution: [what you chose and why, e.g. "kept theirs' naming + ours' postal code addition"]
+  Missing: [ONLY if the AI lacks context to be fully confident — e.g. "business rules for balance threshold (>5 vs >0) not documented" or "no ticket context — unclear if changes were coordinated". Omit this line entirely if no concerns.]
+  Keep each line concise (under 100 chars). This will be rendered directly in the UI.
 
 ${windowed.ours.ticket || windowed.theirs.ticket ? `## Why each side made this change
 
@@ -335,7 +340,7 @@ This file has ${blocks.length} conflict(s). Resolve ALL of them.
 Return ONLY a JSON array with exactly ${blocks.length} object(s), one per conflict in order.
 Each object must have exactly two fields:
 - "resolution": the resolved code with no conflict markers, no explanation, no markdown
-- "explanation": 2-3 sentences explaining what each side was trying to do and why your resolution makes sense
+- "explanation": a structured summary with line breaks: "Ours: [what changed]\nTheirs: [what changed]\nResolution: [what you chose and why]\nMissing: [ONLY if lacking context, omit if none]". Keep each part concise.
 
 Consider all conflicts together — they are in the same file and may be related.
 

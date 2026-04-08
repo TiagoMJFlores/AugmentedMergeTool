@@ -1,5 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import { spawnSync } from 'child_process';
 import simpleGit from 'simple-git';
 import { buildConflictBlocks } from '../../core/buildConflictBlocks.js';
 import { resolveConflict, resolveAllConflicts } from '../../core/resolveConflict.js';
@@ -484,18 +485,31 @@ export class GuiSession {
     return this.getState();
   }
 
-  finish(finalContent?: string): void {
-    if (typeof finalContent === 'string') {
-      fs.writeFileSync(this.data.args.merged, finalContent, 'utf-8');
-      return;
-    }
-    const decisions: ResolutionDecision[] = this.data.blocks.map((block) => ({
-      range: block.range,
-      resolution: block.appliedResolution,
-    }));
+  async finish(finalContent?: string): Promise<void> {
+    const filePath = this.data.args.merged;
 
-    const { content } = applyResolutionsToContent(this.data.originalMergedContent, decisions);
-    fs.writeFileSync(this.data.args.merged, content, 'utf-8');
+    if (typeof finalContent === 'string') {
+      fs.writeFileSync(filePath, finalContent, 'utf-8');
+    } else {
+      const decisions: ResolutionDecision[] = this.data.blocks.map((block) => ({
+        range: block.range,
+        resolution: block.appliedResolution,
+      }));
+      const { content } = applyResolutionsToContent(this.data.originalMergedContent, decisions);
+      fs.writeFileSync(filePath, content, 'utf-8');
+    }
+
+    // Stage the resolved file so git marks it as no longer conflicting
+    // Use repoDir (where git status found the conflicts) to ensure we
+    // hit the correct git repo root, not a nested submodule
+    const cwd = this.data.args.repoDir || path.dirname(filePath);
+    const addResult = spawnSync('git', ['add', '--', filePath], {
+      cwd,
+      encoding: 'utf-8',
+    });
+    if (addResult.status !== 0) {
+      throw new Error(`git add failed: ${addResult.stderr?.trim()}`);
+    }
   }
 
   getState(): GuiSessionState {

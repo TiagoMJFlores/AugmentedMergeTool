@@ -3,6 +3,7 @@ export interface MergeToolArgs {
   base: string;
   remote: string;
   merged: string;
+  repoDir?: string;
 }
 
 export interface GuiConflictBlock {
