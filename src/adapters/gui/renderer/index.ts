@@ -52,11 +52,9 @@ const conflictGutter = document.getElementById('conflict-gutter');
 const explanation = document.getElementById('explanation');
 const explanationLabel = document.getElementById('explanation-label');
 const conflictIndicator = document.getElementById('conflict-indicator');
-const status = document.getElementById('status');
 const actionsSelect = document.getElementById('actions-select') as HTMLSelectElement | null;
 const prevButton = document.getElementById('prev-btn') as HTMLButtonElement | null;
 const nextButton = document.getElementById('next-btn') as HTMLButtonElement | null;
-const resolveButton = document.getElementById('resolve-btn') as HTMLButtonElement | null;
 const finishButton = document.getElementById('finish-btn') as HTMLButtonElement | null;
 const resultEditor = document.getElementById('result-editor') as HTMLTextAreaElement | null;
 const resultHighlight = document.getElementById('result-highlight');
@@ -129,15 +127,12 @@ function renderCodePane(
 
     const isInActiveRange = lineNumber >= activeRange.start && lineNumber <= activeRange.end;
 
-    if (conflict && isGenuineDiff) {
-      lineElement.classList.add('diff-line');
-      if (isInActiveRange) lineElement.classList.add('active-line');
-    } else if (conflict && !isGenuineDiff) {
-      // Identical line inside a conflict block — grey match highlight
-      lineElement.classList.add('match-line');
-      if (isInActiveRange) lineElement.classList.add('active-match-line');
-    } else if (!conflict && isGenuineDiff) {
-      lineElement.classList.add('change-line');
+    if (isGenuineDiff) {
+      if (isInActiveRange) {
+        lineElement.classList.add('active-line');
+      } else {
+        lineElement.classList.add(conflict ? 'diff-line' : 'change-line');
+      }
     }
     lineElement.textContent = lines[index] ?? '';
     fragment.appendChild(lineElement);
@@ -214,44 +209,30 @@ function updateActionButtons(block: GuiConflictBlock): void {
   }
 }
 
-function renderConflictArrows(nextState: GuiSessionState): void {
-  if (!conflictGutter || !localPane) return;
-  const gutterInner = document.createElement('div');
-  gutterInner.className = 'conflict-gutter-inner';
-  gutterInner.style.height = `${localPane.scrollHeight}px`;
-  const firstLine = localPane.querySelector('.code-line') as HTMLElement | null;
-  const lineHeight =
-    firstLine?.getBoundingClientRect().height || Number.parseFloat(getComputedStyle(localPane).lineHeight) || 20;
+function renderConflictArrow(nextState: GuiSessionState): void {
+  if (!conflictGutter) return;
 
-  for (const block of nextState.blocks) {
-    const arrowButton = document.createElement('button');
-    arrowButton.className = `conflict-arrow${block.index === nextState.currentIndex ? ' active' : ''}`;
-    arrowButton.textContent = getArrowLabel(block.selectedSide);
-    arrowButton.title = `Conflict ${block.index + 1}: click to toggle selection direction`;
-    arrowButton.setAttribute('aria-label', `Conflict ${block.index + 1} selector`);
+  const block = nextState.blocks[nextState.currentIndex];
+  if (!block) {
+    conflictGutter.replaceChildren();
+    return;
+  }
 
-    const midpointLine = Math.floor((block.localRange.start + block.localRange.end) / 2);
-    const topOffset = Math.max(0, (midpointLine - 1) * lineHeight);
-    arrowButton.style.top = `${Math.max(0, topOffset)}px`;
-    arrowButton.addEventListener('click', async () => {
-      centerResultOnNextRender = true;
-      const navigatedState = await window.mergeGuiApi.navigateTo(block.index);
-      const updatedState = await window.mergeGuiApi.applyResolution({
-        conflictIndex: block.index,
-        mode: getNextMode(navigatedState.blocks[block.index]?.selectedSide ?? null),
-      });
-      render(updatedState);
+  const arrowButton = document.createElement('button');
+  arrowButton.className = 'conflict-arrow active';
+  arrowButton.textContent = getArrowLabel(block.selectedSide);
+  arrowButton.title = `Click to toggle selection direction`;
+  arrowButton.addEventListener('click', async () => {
+    centerResultOnNextRender = true;
+    const navigatedState = await window.mergeGuiApi.navigateTo(block.index);
+    const updatedState = await window.mergeGuiApi.applyResolution({
+      conflictIndex: block.index,
+      mode: getNextMode(navigatedState.blocks[block.index]?.selectedSide ?? null),
     });
-    gutterInner.appendChild(arrowButton);
-  }
+    render(updatedState);
+  });
 
-  conflictGutter.replaceChildren(gutterInner);
-}
-
-function syncGutterToLocal(): void {
-  if (conflictGutter && localPane) {
-    conflictGutter.scrollTop = localPane.scrollTop;
-  }
+  conflictGutter.replaceChildren(arrowButton);
 }
 
 function scrollActiveLineToCenter(container: HTMLElement | null, instant = false): void {
@@ -315,18 +296,18 @@ function renderFileSidebar(multiFile: GuiMultiFileState | null): void {
     li.addEventListener('click', async () => {
       hasManualResultEdits = false;
       centerResultOnNextRender = true;
-      if (status) status.textContent = 'Switching file...';
+      if (explanation) explanation.textContent = 'Analysing conflicts...';
       const newState = await window.mergeGuiApi.switchFile(file.path);
       render(newState);
       // Generate AI for new file if needed
       if (newState.total > 0 && newState.blocks.some((b) => !b.aiResult)) {
-        if (status) status.textContent = `Generating AI suggestions for ${newState.total} conflict(s)...`;
+        if (explanation) explanation.textContent = 'Analysing conflicts...';
         try {
           render(await window.mergeGuiApi.generateAllAiResolutions());
-          if (status) status.textContent = 'All AI suggestions ready.';
+          // explanation will be set per-conflict by render()
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
-          if (status) status.textContent = `Could not generate AI suggestions: ${message}`;
+          if (explanation) explanation.textContent = 'Something went wrong while analysing conflicts. Please check your API key and try again.';
         }
       }
     });
@@ -356,8 +337,8 @@ function render(nextState: GuiSessionState): void {
   const mergedPathLabel = nextState.mergedPath;
 
   if (nextState.total === 0) {
-    if (status) {
-      status.textContent = `No conflict markers found in MERGED file: ${nextState.mergedPath}`;
+    if (explanation) {
+      explanation.textContent = '';
     }
     if (progress) progress.textContent = `0 / 0 \u2022 ${mergedPathLabel}`;
     if (conflictIndicator) conflictIndicator.textContent = '';
@@ -368,7 +349,7 @@ function render(nextState: GuiSessionState): void {
     if (conflictGutter) {
       conflictGutter.replaceChildren();
     }
-    if (explanation) explanation.textContent = 'Open a file that still contains Git conflict markers.';
+    if (explanation) explanation.textContent = '';
     if (explanationLabel) explanationLabel.textContent = '';
     return;
   }
@@ -404,22 +385,20 @@ function render(nextState: GuiSessionState): void {
     block.previewRange
   );
 
-  if (explanationLabel) {
-    explanationLabel.textContent = `Conflict ${idx + 1} of ${nextState.total}`;
-  }
   if (explanation) {
-    explanation.textContent = block.explanation || 'Generating AI explanation...';
+    if (block.explanation) {
+      explanation.textContent = block.explanation;
+    } else if (!block.actionTaken) {
+      // Keep existing message (error or "Analysing...") — don't overwrite
+    }
   }
 
-  if (status) {
-    status.textContent = block.actionTaken ? 'AI resolution applied.' : 'Pending AI resolution...';
-  }
   updateActionButtons(block);
 
   if (prevButton) prevButton.disabled = nextState.total === 0;
   if (nextButton) nextButton.disabled = nextState.total === 0;
   if (finishButton) finishButton.disabled = !nextState.complete;
-  renderConflictArrows(nextState);
+  renderConflictArrow(nextState);
 
   const navigating = centerResultOnNextRender;
   scrollActiveLineToCenter(localPane, navigating);
@@ -438,9 +417,6 @@ function render(nextState: GuiSessionState): void {
         resultEditor.scrollTop = targetTop;
       }
     }
-    syncGutterToLocal();
-  } else {
-    syncGutterToLocal();
   }
 }
 
@@ -466,12 +442,6 @@ function wireActions(): void {
     render(await window.mergeGuiApi.navigateTo(nextIndex));
   });
 
-  resolveButton?.addEventListener('click', async () => {
-    const current = assertState();
-    centerResultOnNextRender = true;
-    render(await window.mergeGuiApi.generateAiResolution({ conflictIndex: current.currentIndex }));
-  });
-
   actionsSelect?.addEventListener('change', async () => {
     const current = assertState();
     centerResultOnNextRender = true;
@@ -489,7 +459,6 @@ function wireActions(): void {
     render(await window.mergeGuiApi.applyResolution({ conflictIndex: current.currentIndex, mode }));
   });
 
-  localPane?.addEventListener('scroll', () => syncGutterToLocal());
   finishButton?.addEventListener('click', async () => {
     await window.mergeGuiApi.finish(resultEditor?.value);
     // In multi-file mode, finish doesn't exit — it switches to next file
@@ -519,7 +488,7 @@ function wireActions(): void {
     if (!current) return;
     const block = current.blocks[current.currentIndex];
     if (!block) return;
-    renderResultPane(resultEditor, resultEditor.value, current.currentIndex, [], block.previewRange);
+    renderResultPane(resultEditor, resultEditor.value, current.currentIndex, current.previewLineOwners, block.previewRange);
   });
 
   sidebarToggle?.addEventListener('click', () => {
@@ -548,27 +517,24 @@ async function init(): Promise<void> {
   const hasPending = current.blocks.some((block) => !block.aiResult);
   if (!hasPending) return;
 
-  if (status) {
-    status.textContent = `Generating AI suggestions for ${current.total} conflict(s)...`;
+  if (explanation) {
+    explanation.textContent = 'Analysing conflicts...';
   }
 
   try {
     render(await window.mergeGuiApi.generateAllAiResolutions());
-    if (status) {
-      status.textContent = 'All AI suggestions ready.';
-    }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    if (status) {
-      status.textContent = `Could not generate AI suggestions: ${message}`;
+    if (explanation) {
+      explanation.textContent = 'Something went wrong while analysing conflicts. Please check your API key and try again.';
     }
   }
 }
 
 void init().catch((error: unknown) => {
   const message = error instanceof Error ? error.message : String(error);
-  if (status) {
-    status.textContent = `Failed to initialize GUI: ${message}`;
+  if (explanation) {
+    explanation.textContent = 'Something went wrong while analysing conflicts. Please check your API key and try again.';
   }
   if (progress) {
     progress.textContent = 'Initialization error';
