@@ -65,6 +65,17 @@ const fileList = document.getElementById('file-list');
 const sidebarToggle = document.getElementById('sidebar-toggle');
 const sidebarClose = document.getElementById('sidebar-close');
 const finishAllButton = document.getElementById('finish-all-btn') as HTMLButtonElement | null;
+const settingsBtn = document.getElementById('settings-btn');
+const settingsModal = document.getElementById('settings-modal');
+const settingsClose = document.getElementById('settings-close');
+const settingsSave = document.getElementById('settings-save');
+const cfgAnthropicKey = document.getElementById('cfg-anthropic-key') as HTMLInputElement | null;
+const cfgProvider = document.getElementById('cfg-provider') as HTMLSelectElement | null;
+const cfgLinearKey = document.getElementById('cfg-linear-key') as HTMLInputElement | null;
+const cfgJiraKey = document.getElementById('cfg-jira-key') as HTMLInputElement | null;
+const cfgJiraUrl = document.getElementById('cfg-jira-url') as HTMLInputElement | null;
+const cfgGithubToken = document.getElementById('cfg-github-token') as HTMLInputElement | null;
+const cfgGithubRepo = document.getElementById('cfg-github-repo') as HTMLInputElement | null;
 
 if (!resultEditor) {
   throw new Error('result editor not found');
@@ -309,7 +320,10 @@ function renderFileSidebar(multiFile: GuiMultiFileState | null): void {
           // explanation will be set per-conflict by render()
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
-          if (explanation) explanation.textContent = 'Something went wrong while analysing conflicts. Please check your API key and try again.';
+          if (explanation) {
+            explanation.innerHTML = 'Something went wrong while analysing conflicts.<br><a href="#" class="open-settings-link">&#x2699; Open Settings</a>';
+            explanation.querySelector('.open-settings-link')?.addEventListener('click', (e) => { e.preventDefault(); settingsBtn?.click(); });
+          }
         }
       }
     });
@@ -539,6 +553,44 @@ function wireActions(): void {
   finishAllButton?.addEventListener('click', async () => {
     await window.mergeGuiApi.finishAll();
   });
+
+  // --- Settings ---
+  function updateProviderFields(): void {
+    const val = cfgProvider?.value || 'none';
+    document.getElementById('cfg-linear-fields')?.classList.toggle('hidden', val !== 'linear');
+    document.getElementById('cfg-jira-fields')?.classList.toggle('hidden', val !== 'jira');
+    document.getElementById('cfg-github-fields')?.classList.toggle('hidden', val !== 'github');
+  }
+
+  settingsBtn?.addEventListener('click', async () => {
+    const config = await window.mergeGuiApi.getConfig();
+    if (cfgAnthropicKey) cfgAnthropicKey.value = config.anthropicApiKey || '';
+    if (cfgProvider) cfgProvider.value = config.ticketProvider || 'none';
+    if (cfgLinearKey) cfgLinearKey.value = config.linearApiKey || '';
+    if (cfgJiraKey) cfgJiraKey.value = config.jiraApiKey || '';
+    if (cfgJiraUrl) cfgJiraUrl.value = config.jiraBaseUrl || '';
+    if (cfgGithubToken) cfgGithubToken.value = config.githubToken || '';
+    if (cfgGithubRepo) cfgGithubRepo.value = config.githubRepo || '';
+    updateProviderFields();
+    settingsModal?.classList.remove('hidden');
+  });
+
+  settingsClose?.addEventListener('click', () => settingsModal?.classList.add('hidden'));
+  settingsModal?.querySelector('.settings-overlay')?.addEventListener('click', () => settingsModal?.classList.add('hidden'));
+  cfgProvider?.addEventListener('change', updateProviderFields);
+
+  settingsSave?.addEventListener('click', async () => {
+    await window.mergeGuiApi.saveConfig({
+      anthropicApiKey: cfgAnthropicKey?.value || '',
+      ticketProvider: (cfgProvider?.value as 'none' | 'linear' | 'jira' | 'github') || 'none',
+      linearApiKey: cfgLinearKey?.value || undefined,
+      jiraApiKey: cfgJiraKey?.value || undefined,
+      jiraBaseUrl: cfgJiraUrl?.value || undefined,
+      githubToken: cfgGithubToken?.value || undefined,
+      githubRepo: cfgGithubRepo?.value || undefined,
+    });
+    settingsModal?.classList.add('hidden');
+  });
 }
 
 async function init(): Promise<void> {
@@ -561,7 +613,8 @@ async function init(): Promise<void> {
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (explanation) {
-      explanation.textContent = 'Something went wrong while analysing conflicts. Please check your API key and try again.';
+      explanation.innerHTML = 'Something went wrong while analysing conflicts.<br><a href="#" class="open-settings-link">&#x2699; Open Settings</a>';
+      explanation.querySelector('.open-settings-link')?.addEventListener('click', (e) => { e.preventDefault(); settingsBtn?.click(); });
     }
   }
 }
@@ -569,7 +622,8 @@ async function init(): Promise<void> {
 void init().catch((error: unknown) => {
   const message = error instanceof Error ? error.message : String(error);
   if (explanation) {
-    explanation.textContent = 'Something went wrong while analysing conflicts. Please check your API key and try again.';
+    explanation.innerHTML = 'Something went wrong while analysing conflicts.<br><a href="#" class="open-settings-link">&#x2699; Open Settings</a>';
+      explanation.querySelector('.open-settings-link')?.addEventListener('click', (e) => { e.preventDefault(); settingsBtn?.click(); });
   }
   if (progress) {
     progress.textContent = 'Initialization error';
