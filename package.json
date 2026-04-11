@@ -2,14 +2,13 @@
   "name": "augmented-merge-tool",
   "version": "1.0.0",
   "description": "Essentialist AI merge conflict resolver — detects conflicts, extracts ticket intent from commit messages, resolves with Claude.",
-  "main": "dist/index.js",
+  "main": "dist/adapters/gui/main.js",
   "bin": {
-    "mergeagent": "dist/index.js",
-    "mergeagent-gui": "dist/adapters/gui/main.js"
+    "mergeagent": "dist/adapters/gui/main.js"
   },
   "scripts": {
     "build": "tsc && npm run copy:gui-assets",
-    "start": "node dist/index.js",
+    "start": "npm run start:gui",
     "test": "vitest run",
     "test:watch": "vitest",
     "copy:gui-assets": "node -e \"const fs=require('fs');fs.mkdirSync('dist/adapters/gui/renderer',{recursive:true});fs.copyFileSync('src/adapters/gui/renderer/index.html','dist/adapters/gui/renderer/index.html');fs.copyFileSync('src/adapters/gui/renderer/styles.css','dist/adapters/gui/renderer/styles.css');fs.copyFileSync('src/adapters/gui/renderer/cjs-shim.js','dist/adapters/gui/renderer/cjs-shim.js');\"",

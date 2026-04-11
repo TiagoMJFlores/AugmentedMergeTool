@@ -1,4 +1,3 @@
-import 'dotenv/config';
 import Anthropic from '@anthropic-ai/sdk';
 import type { ConflictBlock, ResolveResult } from './types.js';
 

@@ -1,4 +1,3 @@
-import 'dotenv/config';
 import { LinearClient } from '@linear/sdk';
 
 let _client: LinearClient | null = null;

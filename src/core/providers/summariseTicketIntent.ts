@@ -1,4 +1,3 @@
-import 'dotenv/config';
 import Anthropic from '@anthropic-ai/sdk';
 
 let anthropicClient: Anthropic | null = null;

@@ -38,6 +38,7 @@
             <span class="nav-spacer"></span>
             <span id="resolve-progress" class="resolve-progress"></span>
             <button id="finish-btn">Resolve File</button>
+            <button id="settings-btn" class="settings-btn" title="Settings">&#x2699;</button>
           </nav>
 
           <section class="top-grid">
@@ -72,6 +73,60 @@
             </select>
           </section>
         </main>
+      </div>
+    </div>
+
+    <div id="settings-modal" class="settings-modal hidden">
+      <div class="settings-overlay"></div>
+      <div class="settings-panel">
+        <div class="settings-header">
+          <h3>Settings</h3>
+          <button id="settings-close" class="sidebar-close">&times;</button>
+        </div>
+        <div class="settings-body">
+          <div class="settings-field">
+            <label for="cfg-anthropic-key">Anthropic API Key</label>
+            <input id="cfg-anthropic-key" type="password" placeholder="sk-ant-..." autocomplete="off" />
+          </div>
+          <div class="settings-field">
+            <label for="cfg-provider">Ticket Provider</label>
+            <select id="cfg-provider">
+              <option value="none">None</option>
+              <option value="linear">Linear</option>
+              <option value="jira">Jira</option>
+              <option value="github">GitHub</option>
+            </select>
+          </div>
+          <div id="cfg-linear-fields" class="provider-fields hidden">
+            <div class="settings-field">
+              <label for="cfg-linear-key">Linear API Key</label>
+              <input id="cfg-linear-key" type="password" placeholder="lin_api_..." autocomplete="off" />
+            </div>
+          </div>
+          <div id="cfg-jira-fields" class="provider-fields hidden">
+            <div class="settings-field">
+              <label for="cfg-jira-key">Jira API Key</label>
+              <input id="cfg-jira-key" type="password" autocomplete="off" />
+            </div>
+            <div class="settings-field">
+              <label for="cfg-jira-url">Jira Base URL</label>
+              <input id="cfg-jira-url" type="text" placeholder="https://yourcompany.atlassian.net" />
+            </div>
+          </div>
+          <div id="cfg-github-fields" class="provider-fields hidden">
+            <div class="settings-field">
+              <label for="cfg-github-token">GitHub Token</label>
+              <input id="cfg-github-token" type="password" autocomplete="off" />
+            </div>
+            <div class="settings-field">
+              <label for="cfg-github-repo">GitHub Repo</label>
+              <input id="cfg-github-repo" type="text" placeholder="owner/repo" />
+            </div>
+          </div>
+        </div>
+        <div class="settings-footer">
+          <button id="settings-save" class="settings-save-btn">Save</button>
+        </div>
       </div>
     </div>
 

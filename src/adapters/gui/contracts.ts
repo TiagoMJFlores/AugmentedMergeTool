@@ -70,6 +70,16 @@ export interface ApplyResolutionInput {
   editedResolution?: string;
 }
 
+export interface MergeAgentConfig {
+  anthropicApiKey: string;
+  ticketProvider: 'none' | 'linear' | 'jira' | 'github';
+  linearApiKey?: string;
+  jiraApiKey?: string;
+  jiraBaseUrl?: string;
+  githubToken?: string;
+  githubRepo?: string;
+}
+
 export interface RendererApi {
   getState: () => Promise<GuiSessionState>;
   generateAiResolution: (input: ResolveAndStoreInput) => Promise<GuiSessionState>;
@@ -79,4 +89,7 @@ export interface RendererApi {
   finish: (finalContent?: string) => Promise<void>;
   switchFile: (filePath: string) => Promise<GuiSessionState>;
   finishAll: () => Promise<void>;
+  getConfig: () => Promise<MergeAgentConfig>;
+  saveConfig: (config: MergeAgentConfig) => Promise<void>;
+  onSessionsReady: (callback: () => void) => void;
 }
