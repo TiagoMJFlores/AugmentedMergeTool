@@ -16,7 +16,7 @@ function loadConfig(): MergeAgentConfig {
   try {
     return JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf-8'));
   } catch {
-    return { anthropicApiKey: '', ticketProvider: 'none' };
+    return { aiProvider: 'anthropic', anthropicApiKey: '', ticketProvider: 'none' };
   }
 }
 
@@ -26,7 +26,10 @@ function saveConfigToDisk(config: MergeAgentConfig): void {
 }
 
 function applyConfigToEnv(config: MergeAgentConfig): void {
+  if (config.aiProvider) process.env.AI_PROVIDER = config.aiProvider;
   if (config.anthropicApiKey) process.env.ANTHROPIC_API_KEY = config.anthropicApiKey;
+  if (config.openaiApiKey) process.env.OPENAI_API_KEY = config.openaiApiKey;
+  if (config.openaiModel) process.env.OPENAI_MODEL = config.openaiModel;
   if (config.ticketProvider) process.env.TICKET_PROVIDER = config.ticketProvider;
   if (config.linearApiKey) process.env.LINEAR_API_KEY = config.linearApiKey;
   if (config.jiraApiKey) process.env.JIRA_API_KEY = config.jiraApiKey;
@@ -40,6 +43,7 @@ applyConfigToEnv(loadConfig());
 let activeSession: GuiSession | null = null;
 const sessions = new Map<string, GuiSession>();
 let multiFileMode = false;
+let userResolved = false;
 
 function getActiveSession(): GuiSession {
   if (!activeSession) throw new Error('Session not initialized');
@@ -178,6 +182,7 @@ ipcMain.handle('gui:navigate', async (_event, index: number) => {
 ipcMain.handle('gui:finish', async (_event, finalContent?: string) => {
   const session = getActiveSession();
   await session.finish(finalContent);
+  userResolved = true;
 
   if (!multiFileMode) {
     return;
@@ -219,5 +224,8 @@ ipcMain.handle('gui:save-config', async (_event, config: MergeAgentConfig) => {
 });
 
 app.on('window-all-closed', () => {
+  // Exit with code 1 if user closed without resolving — tells git mergetool
+  // that the merge was NOT completed, so it won't auto-stage the file
+  process.exitCode = userResolved ? 0 : 1;
   app.quit();
 });

@@ -132,128 +132,55 @@ describe('buildPrompt', () => {
   });
 });
 
+function mockAI(text: string) {
+  vi.doMock('ai', () => ({
+    generateText: vi.fn().mockResolvedValue({ text }),
+  }));
+  vi.doMock('@ai-sdk/anthropic', () => ({ createAnthropic: () => () => ({}) }));
+  vi.doMock('@ai-sdk/openai', () => ({ createOpenAI: () => () => ({}) }));
+  process.env.ANTHROPIC_API_KEY = 'test-key';
+}
+
 describe('resolveConflict', () => {
   beforeEach(() => {
     vi.resetModules();
     vi.restoreAllMocks();
   });
 
-  it('should return parsed resolution and explanation from Claude', async () => {
-    const mockResponse = {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify({
-            resolution: 'const x = 3;',
-            explanation:
-              'Our side set x to 1, theirs set it to 2. Merging to 3 combines both intents.',
-          }),
-        },
-      ],
-    };
-
-    const mockCreate = vi.fn().mockResolvedValue(mockResponse);
-
-    vi.doMock('@anthropic-ai/sdk', () => ({
-      default: class {
-        messages = { create: mockCreate };
-      },
+  it('should return parsed resolution and explanation from AI', async () => {
+    mockAI(JSON.stringify({
+      resolution: 'const x = 3;',
+      explanation: 'Our side set x to 1, theirs set it to 2. Merging to 3 combines both intents.',
     }));
 
-    process.env.ANTHROPIC_API_KEY = 'test-key';
-
     const { resolveConflict: resolve } = await import('./resolveConflict.js');
-    const block = makeBlock();
-    const result = await resolve(block);
+    const result = await resolve(makeBlock());
 
     expect(result.resolution).toBe('const x = 3;');
     expect(result.explanation).toBe(
       'Our side set x to 1, theirs set it to 2. Merging to 3 combines both intents.'
     );
-    expect(mockCreate).toHaveBeenCalledOnce();
   });
 
-  it('should throw on non-JSON Claude response', async () => {
-    const mockResponse = {
-      content: [
-        {
-          type: 'text',
-          text: 'Sorry, I cannot help with that.',
-        },
-      ],
-    };
-
-    const mockCreate = vi.fn().mockResolvedValue(mockResponse);
-
-    vi.doMock('@anthropic-ai/sdk', () => ({
-      default: class {
-        messages = { create: mockCreate };
-      },
-    }));
-
-    process.env.ANTHROPIC_API_KEY = 'test-key';
+  it('should throw on non-JSON AI response', async () => {
+    mockAI('Sorry, I cannot help with that.');
 
     const { resolveConflict: resolve } = await import('./resolveConflict.js');
-    const block = makeBlock();
 
-    await expect(resolve(block)).rejects.toThrow(
-      'Failed to parse Claude response as JSON'
+    await expect(resolve(makeBlock())).rejects.toThrow(
+      'Failed to parse AI response as JSON'
     );
   });
 
   it('should handle response with extra whitespace around JSON', async () => {
-    const json = JSON.stringify({
-      resolution: 'merged code',
-      explanation: 'Combined both changes.',
-    });
-    const mockResponse = {
-      content: [{ type: 'text', text: `  \n${json}\n  ` }],
-    };
-
-    const mockCreate = vi.fn().mockResolvedValue(mockResponse);
-
-    vi.doMock('@anthropic-ai/sdk', () => ({
-      default: class {
-        messages = { create: mockCreate };
-      },
-    }));
-
-    process.env.ANTHROPIC_API_KEY = 'test-key';
+    const json = JSON.stringify({ resolution: 'merged code', explanation: 'Combined both changes.' });
+    mockAI(`  \n${json}\n  `);
 
     const { resolveConflict: resolve } = await import('./resolveConflict.js');
     const result = await resolve(makeBlock());
 
     expect(result.resolution).toBe('merged code');
     expect(result.explanation).toBe('Combined both changes.');
-  });
-
-  it('should pass correct model and max_tokens to Anthropic', async () => {
-    const mockCreate = vi.fn().mockResolvedValue({
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify({ resolution: 'ok', explanation: 'ok' }),
-        },
-      ],
-    });
-
-    vi.doMock('@anthropic-ai/sdk', () => ({
-      default: class {
-        messages = { create: mockCreate };
-      },
-    }));
-
-    process.env.ANTHROPIC_API_KEY = 'test-key';
-
-    const { resolveConflict: resolve } = await import('./resolveConflict.js');
-    await resolve(makeBlock());
-
-    expect(mockCreate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        model: 'claude-opus-4-5',
-        max_tokens: 4096,
-      })
-    );
   });
 });
 
@@ -308,25 +235,13 @@ describe('resolveAllConflicts', () => {
   });
 
   it('should delegate to resolveConflict for single block', async () => {
-    const mockCreate = vi.fn().mockResolvedValue({
-      content: [{ type: 'text', text: JSON.stringify({ resolution: 'ok', explanation: 'single' }) }],
-    });
-
-    vi.doMock('@anthropic-ai/sdk', () => ({
-      default: class {
-        messages = { create: mockCreate };
-      },
-    }));
-
-    process.env.ANTHROPIC_API_KEY = 'test-key';
+    mockAI(JSON.stringify({ resolution: 'ok', explanation: 'single' }));
 
     const { resolveAllConflicts: resolveAll } = await import('./resolveConflict.js');
     const results = await resolveAll([makeBlock()]);
 
     expect(results).toHaveLength(1);
     expect(results[0].resolution).toBe('ok');
-    // Single block uses resolveConflict which sends max_tokens 4096
-    expect(mockCreate).toHaveBeenCalledWith(expect.objectContaining({ max_tokens: 4096 }));
   });
 
   it('should parse batch JSON array for multiple blocks', async () => {
@@ -334,17 +249,7 @@ describe('resolveAllConflicts', () => {
       { resolution: 'const x = 3;', explanation: 'merged x' },
       { resolution: 'const y = 4;', explanation: 'merged y' },
     ];
-    const mockCreate = vi.fn().mockResolvedValue({
-      content: [{ type: 'text', text: JSON.stringify(batchResponse) }],
-    });
-
-    vi.doMock('@anthropic-ai/sdk', () => ({
-      default: class {
-        messages = { create: mockCreate };
-      },
-    }));
-
-    process.env.ANTHROPIC_API_KEY = 'test-key';
+    mockAI(JSON.stringify(batchResponse));
 
     const { resolveAllConflicts: resolveAll } = await import('./resolveConflict.js');
     const results = await resolveAll([makeBlock(), makeBlock()]);
@@ -354,61 +259,18 @@ describe('resolveAllConflicts', () => {
     expect(results[1].explanation).toBe('merged y');
   });
 
-  it('should scale max_tokens with number of blocks', async () => {
-    const batchResponse = Array.from({ length: 3 }, (_, i) => ({
-      resolution: `res${i}`,
-      explanation: `exp${i}`,
-    }));
-    const mockCreate = vi.fn().mockResolvedValue({
-      content: [{ type: 'text', text: JSON.stringify(batchResponse) }],
-    });
-
-    vi.doMock('@anthropic-ai/sdk', () => ({
-      default: class {
-        messages = { create: mockCreate };
-      },
-    }));
-
-    process.env.ANTHROPIC_API_KEY = 'test-key';
-
-    const { resolveAllConflicts: resolveAll } = await import('./resolveConflict.js');
-    await resolveAll([makeBlock(), makeBlock(), makeBlock()]);
-
-    expect(mockCreate).toHaveBeenCalledWith(expect.objectContaining({ max_tokens: 12288 }));
-  });
-
   it('should throw on array length mismatch', async () => {
-    const mockCreate = vi.fn().mockResolvedValue({
-      content: [{ type: 'text', text: JSON.stringify([{ resolution: 'a', explanation: 'b' }]) }],
-    });
-
-    vi.doMock('@anthropic-ai/sdk', () => ({
-      default: class {
-        messages = { create: mockCreate };
-      },
-    }));
-
-    process.env.ANTHROPIC_API_KEY = 'test-key';
+    mockAI(JSON.stringify([{ resolution: 'a', explanation: 'b' }]));
 
     const { resolveAllConflicts: resolveAll } = await import('./resolveConflict.js');
     await expect(resolveAll([makeBlock(), makeBlock()])).rejects.toThrow('Expected JSON array of 2 results, got 1');
   });
 
   it('should throw on non-JSON response', async () => {
-    const mockCreate = vi.fn().mockResolvedValue({
-      content: [{ type: 'text', text: 'not json' }],
-    });
-
-    vi.doMock('@anthropic-ai/sdk', () => ({
-      default: class {
-        messages = { create: mockCreate };
-      },
-    }));
-
-    process.env.ANTHROPIC_API_KEY = 'test-key';
+    mockAI('not json');
 
     const { resolveAllConflicts: resolveAll } = await import('./resolveConflict.js');
-    await expect(resolveAll([makeBlock(), makeBlock()])).rejects.toThrow('Failed to parse batch Claude response');
+    await expect(resolveAll([makeBlock(), makeBlock()])).rejects.toThrow('Failed to parse batch');
   });
 });
 

@@ -78,12 +78,13 @@ git mergetool
 
 Click the **gear icon** in the top-right corner of the app to configure:
 
-- **Anthropic API Key** — required for AI suggestions
+- **AI Provider** — Anthropic (Claude) or OpenAI (GPT)
+- **API Key** — for the selected provider
 - **Ticket Provider** (optional) — Linear, Jira, or GitHub for ticket context
 
 Config is saved to `~/.mergeagent/config.json` and persists between runs.
 
-Without an API key, the tool still works for manual conflict resolution (Choose left/right/both). AI features require the key.
+Without an API key, the tool still works for manual conflict resolution (Choose left/right/both). AI features require a key.
 
 ------------------------------------------------------------------------
 
@@ -91,7 +92,7 @@ Without an API key, the tool still works for manual conflict resolution (Choose 
 
 - Node.js >= 18
 - Git
-- Anthropic API key (for AI features)
+- Anthropic or OpenAI API key (for AI features)
 
 ### Optional
 

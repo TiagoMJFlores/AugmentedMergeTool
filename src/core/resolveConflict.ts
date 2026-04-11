@@ -1,19 +1,31 @@
-import 'dotenv/config';
-import Anthropic from '@anthropic-ai/sdk';
+import { generateText } from 'ai';
+import { createAnthropic } from '@ai-sdk/anthropic';
+import { createOpenAI } from '@ai-sdk/openai';
 import type { ConflictBlock, ResolveResult } from './types.js';
 
-let _anthropic: Anthropic | null = null;
-
-function getAnthropicClient(): Anthropic {
-  if (!_anthropic) {
-    if (!process.env.ANTHROPIC_API_KEY) {
-      throw new Error(
-        'ANTHROPIC_API_KEY is not set. Add it to your .env file.'
-      );
+function getModel() {
+  if (process.env.AI_PROVIDER === 'openai') {
+    if (!process.env.OPENAI_API_KEY) {
+      throw new Error('OpenAI API key not configured. Open Settings to add it.');
     }
-    _anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+    const openai = createOpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    return openai(process.env.OPENAI_MODEL || 'gpt-4o');
   }
-  return _anthropic;
+
+  if (!process.env.ANTHROPIC_API_KEY) {
+    throw new Error('Anthropic API key not configured. Open Settings to add it.');
+  }
+  const anthropic = createAnthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  return anthropic('claude-opus-4-5');
+}
+
+async function callAI(prompt: string, maxTokens: number): Promise<string> {
+  const { text } = await generateText({
+    model: getModel(),
+    maxOutputTokens: maxTokens,
+    prompt,
+  });
+  return text.trim();
 }
 
 // --- Output Validation ---
@@ -262,15 +274,7 @@ export async function resolveConflict(
   if (trivial) return trivial;
 
   const prompt = buildPrompt(block);
-  const anthropic = getAnthropicClient();
-
-  const message = await anthropic.messages.create({
-    model: 'claude-opus-4-5',
-    max_tokens: 4096,
-    messages: [{ role: 'user', content: prompt }],
-  });
-
-  const raw = (message.content[0] as { type: 'text'; text: string }).text.trim();
+  const raw = await callAI(prompt, 4096);
 
   let result: ResolveResult;
   try {
@@ -281,7 +285,7 @@ export async function resolveConflict(
     };
   } catch {
     throw new Error(
-      `Failed to parse Claude response as JSON. Raw response:\n${raw}`
+      `Failed to parse AI response as JSON. Raw response:\n${raw}`
     );
   }
 
@@ -384,15 +388,7 @@ export async function resolveAllConflicts(
   }
 
   const prompt = buildBatchPrompt(uncachedBlocks);
-  const anthropic = getAnthropicClient();
-
-  const message = await anthropic.messages.create({
-    model: 'claude-opus-4-5',
-    max_tokens: Math.min(4096 * uncachedBlocks.length, 16384),
-    messages: [{ role: 'user', content: prompt }],
-  });
-
-  const raw = (message.content[0] as { type: 'text'; text: string }).text.trim();
+  const raw = await callAI(prompt, Math.min(4096 * uncachedBlocks.length, 16384));
 
   let parsed: unknown;
   try {
