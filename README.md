@@ -80,7 +80,6 @@ Click the **gear icon** in the top-right corner of the app to configure:
 
 - **AI Provider** — Anthropic (Claude) or OpenAI (GPT)
 - **API Key** — for the selected provider
-- **OpenAI Model** (optional) — defaults to `gpt-4o`
 - **Ticket Provider** (optional) — Linear, Jira, or GitHub for ticket context
 
 Config is saved to `~/.mergeagent/config.json` and persists between runs.
