@@ -380,22 +380,33 @@ export class GuiSession {
       remoteRanges = sideViews.ranges.map((r) => r.remoteRange);
     }
 
-    const blocks = sourceBlocks.map((block, index) => ({
-      id: `conflict-${index + 1}`,
-      index,
-      range: block.range,
-      localRange: localRanges[index] ?? { start: 1, end: 1 },
-      remoteRange: remoteRanges[index] ?? { start: 1, end: 1 },
-      previewRange: localRanges[index] ?? { start: 1, end: 1 },
-      ours: block.ours.content,
-      theirs: block.theirs.content,
-      aiResult: '',
-      explanation: '',
-      appliedResolution: null,
-      actionTaken: false,
-      selectedSide: null,
-      selectedAction: null,
-    }));
+    const blocks = sourceBlocks.map((block, index) => {
+      // Default side: the side with the most recent commit
+      let defaultSide: 'local' | 'remote' | null = null;
+      const oursDate = block.ours.latestCommitDate ? new Date(block.ours.latestCommitDate).getTime() : 0;
+      const theirsDate = block.theirs.latestCommitDate ? new Date(block.theirs.latestCommitDate).getTime() : 0;
+      if (oursDate > 0 || theirsDate > 0) {
+        defaultSide = theirsDate > oursDate ? 'remote' : 'local';
+      }
+
+      return {
+        id: `conflict-${index + 1}`,
+        index,
+        range: block.range,
+        localRange: localRanges[index] ?? { start: 1, end: 1 },
+        remoteRange: remoteRanges[index] ?? { start: 1, end: 1 },
+        previewRange: localRanges[index] ?? { start: 1, end: 1 },
+        ours: block.ours.content,
+        theirs: block.theirs.content,
+        aiResult: '',
+        explanation: '',
+        appliedResolution: null,
+        actionTaken: false,
+        selectedSide: null,
+        selectedAction: null,
+        defaultSide,
+      };
+    });
 
     return new GuiSession({
       args,

@@ -19,6 +19,7 @@ interface GuiConflictBlock {
     | 'choose-both-left-first'
     | 'choose-both-right-first'
     | null;
+  defaultSide: 'local' | 'remote' | null;
 }
 
 interface GuiFileEntry {
@@ -202,10 +203,11 @@ function renderResultPane(
   }
 }
 
-function getArrowLabel(selectedSide: 'local' | 'remote' | 'both' | null): string {
-  if (selectedSide === 'local') return '\u2190';
-  if (selectedSide === 'remote') return '\u2192';
-  if (selectedSide === 'both') return '\u2194';
+function getArrowLabel(selectedSide: 'local' | 'remote' | 'both' | null, defaultSide: 'local' | 'remote' | null = null): string {
+  const side = selectedSide ?? defaultSide;
+  if (side === 'local') return '\u2190';
+  if (side === 'remote') return '\u2192';
+  if (side === 'both') return '\u2194';
   return '\u2190';
 }
 
@@ -233,7 +235,7 @@ function renderConflictArrow(nextState: GuiSessionState): void {
 
   const arrowButton = document.createElement('button');
   arrowButton.className = 'conflict-arrow active';
-  arrowButton.textContent = getArrowLabel(block.selectedSide);
+  arrowButton.textContent = getArrowLabel(block.selectedSide, block.defaultSide);
   arrowButton.title = `Click to toggle selection direction`;
   arrowButton.addEventListener('click', async () => {
     centerResultOnNextRender = true;
