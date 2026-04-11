@@ -25,7 +25,10 @@ async function callAI(prompt: string, maxTokens: number): Promise<string> {
     maxOutputTokens: maxTokens,
     prompt,
   });
-  return text.trim();
+  // Strip markdown code fences (```json ... ```) that some models add
+  let cleaned = text.trim();
+  cleaned = cleaned.replace(/^```(?:json)?\s*\n?/i, '').replace(/\n?```\s*$/i, '');
+  return cleaned.trim();
 }
 
 // --- Output Validation ---
@@ -186,11 +189,11 @@ function buildPromptFromWindowed(windowed: ConflictBlock): string {
 Return ONLY a JSON object with exactly two fields:
 - "resolution": the resolved code with no conflict markers, no explanation, no markdown
 - "explanation": a structured summary in exactly this format:
-  Ours: [what our side changed, e.g. "renamed completion → onCompletion and added postalCode parameter"]
-  Theirs: [what their side changed, e.g. "kept original signature, added guard for nil error"]
-  Resolution: [what you chose and why, e.g. "kept theirs' naming + ours' postal code addition"]
-  Missing: [ONLY if the AI lacks context to be fully confident — e.g. "business rules for balance threshold (>5 vs >0) not documented" or "no ticket context — unclear if changes were coordinated". Omit this line entirely if no concerns.]
-  Keep each line concise (under 100 chars). This will be rendered directly in the UI.
+  Ours: [WHY this side changed and WHAT it affects, e.g. "renamed to onCompletion — changes all call sites" or "added postalCode to address format — affects user-facing display"]
+  Theirs: [WHY this side changed and WHAT it affects, e.g. "added nil guard — prevents crash on missing error" or "removed self. prefix — Swift style cleanup, no behavior change"]
+  Resolution: [what you chose, why, and what the reviewer should check, e.g. "kept theirs' guard + ours' postalCode — verify address formatting in UI"]
+  Missing: [ONLY if lacking context — e.g. "balance threshold >5 vs >0 is a business rule not in code" or "function removed here but may be called elsewhere". Omit if no concerns.]
+  Keep each line concise. This will be rendered directly in the UI.
 
 ${windowed.ours.ticket || windowed.theirs.ticket ? `## Why each side made this change
 
@@ -346,7 +349,19 @@ Each object must have exactly two fields:
 - "resolution": the resolved code with no conflict markers, no explanation, no markdown
 - "explanation": a structured summary with line breaks: "Ours: [what changed]\nTheirs: [what changed]\nResolution: [what you chose and why]\nMissing: [ONLY if lacking context, omit if none]". Keep each part concise.
 
-Consider all conflicts together — they are in the same file and may be related.
+CRITICAL — follow these steps in order:
+
+STEP 1: Read ALL conflicts below before resolving any.
+STEP 2: Identify dependencies between conflicts:
+  - If conflict A calls a function, find which conflict defines it
+  - If conflict A renames a variable/parameter, find all conflicts that use it
+  - If conflict A adds a new method, check if other conflicts reference it
+STEP 3: Resolve conflicts in dependency order — define before use.
+STEP 4: After resolving all, verify: every function called exists, every variable used is defined, every renamed symbol is consistent across all resolutions.
+
+If keeping a function CALL in one conflict, you MUST keep its IMPLEMENTATION in another.
+If removing a function DEFINITION, you MUST remove all CALLS to it in other conflicts.
+If renaming something, ALL conflicts must use the new name consistently.
 
 ---
 

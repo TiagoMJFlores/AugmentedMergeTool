@@ -1,4 +1,3 @@
-import 'dotenv/config';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
@@ -224,8 +223,7 @@ ipcMain.handle('gui:save-config', async (_event, config: MergeAgentConfig) => {
 });
 
 app.on('window-all-closed', () => {
-  // Exit with code 1 if user closed without resolving — tells git mergetool
-  // that the merge was NOT completed, so it won't auto-stage the file
-  process.exitCode = userResolved ? 0 : 1;
-  app.quit();
+  // Exit code 1 if user closed without resolving — tells git mergetool
+  // the merge was NOT completed, so it won't auto-stage the file
+  app.exit(userResolved ? 0 : 1);
 });

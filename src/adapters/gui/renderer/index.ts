@@ -326,7 +326,7 @@ function renderFileSidebar(multiFile: GuiMultiFileState | null): void {
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
           if (explanation) {
-            explanation.innerHTML = 'Something went wrong while analysing conflicts.<br><a href="#" class="open-settings-link">&#x2699; Open Settings</a>';
+            explanation.innerHTML = 'API key missing or invalid. Please check your settings.<br><a href="#" class="open-settings-link">&#x2699; Open Settings</a>';
             explanation.querySelector('.open-settings-link')?.addEventListener('click', (e) => { e.preventDefault(); settingsBtn?.click(); });
           }
         }
@@ -629,7 +629,7 @@ async function init(): Promise<void> {
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (explanation) {
-      explanation.innerHTML = 'Something went wrong while analysing conflicts.<br><a href="#" class="open-settings-link">&#x2699; Open Settings</a>';
+      explanation.innerHTML = 'API key missing or invalid. Please check your settings.<br><a href="#" class="open-settings-link">&#x2699; Open Settings</a>';
       explanation.querySelector('.open-settings-link')?.addEventListener('click', (e) => { e.preventDefault(); settingsBtn?.click(); });
     }
   }
@@ -638,7 +638,7 @@ async function init(): Promise<void> {
 void init().catch((error: unknown) => {
   const message = error instanceof Error ? error.message : String(error);
   if (explanation) {
-    explanation.innerHTML = 'Something went wrong while analysing conflicts.<br><a href="#" class="open-settings-link">&#x2699; Open Settings</a>';
+    explanation.innerHTML = 'API key missing or invalid. Please check your settings.<br><a href="#" class="open-settings-link">&#x2699; Open Settings</a>';
       explanation.querySelector('.open-settings-link')?.addEventListener('click', (e) => { e.preventDefault(); settingsBtn?.click(); });
   }
   if (progress) {
