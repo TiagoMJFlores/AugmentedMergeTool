@@ -48,15 +48,15 @@ describe('CLI apply behavior', () => {
     vi.doMock('./core/buildConflictBlocks.js', () => ({
       buildConflictBlocks: vi.fn().mockResolvedValue([
         {
-          ours: { content: 'ours1', ticket: null },
-          theirs: { content: 'theirs1', ticket: null },
+          ours: { content: 'ours1', ticket: null, latestCommitDate: null },
+          theirs: { content: 'theirs1', ticket: null, latestCommitDate: null },
           range: { start: 2, end: 6 },
           surroundingContext: '',
           baseContent: '',
         },
         {
-          ours: { content: 'ours2', ticket: null },
-          theirs: { content: 'theirs2', ticket: null },
+          ours: { content: 'ours2', ticket: null, latestCommitDate: null },
+          theirs: { content: 'theirs2', ticket: null, latestCommitDate: null },
           range: { start: 8, end: 12 },
           surroundingContext: '',
           baseContent: '',
@@ -159,22 +159,22 @@ describe('CLI apply behavior', () => {
     vi.doMock('./core/buildConflictBlocks.js', () => ({
       buildConflictBlocks: vi.fn().mockResolvedValue([
         {
-          ours: { content: 'ours1', ticket: null },
-          theirs: { content: 'theirs1', ticket: null },
+          ours: { content: 'ours1', ticket: null, latestCommitDate: null },
+          theirs: { content: 'theirs1', ticket: null, latestCommitDate: null },
           range: { start: 2, end: 6 },
           surroundingContext: '',
           baseContent: '',
         },
         {
-          ours: { content: 'ours2', ticket: null },
-          theirs: { content: 'theirs2', ticket: null },
+          ours: { content: 'ours2', ticket: null, latestCommitDate: null },
+          theirs: { content: 'theirs2', ticket: null, latestCommitDate: null },
           range: { start: 8, end: 12 },
           surroundingContext: '',
           baseContent: '',
         },
         {
-          ours: { content: 'ours3', ticket: null },
-          theirs: { content: 'theirs3', ticket: null },
+          ours: { content: 'ours3', ticket: null, latestCommitDate: null },
+          theirs: { content: 'theirs3', ticket: null, latestCommitDate: null },
           range: { start: 14, end: 18 },
           surroundingContext: '',
           baseContent: '',
@@ -273,22 +273,22 @@ describe('CLI apply behavior', () => {
     vi.doMock('./core/buildConflictBlocks.js', () => ({
       buildConflictBlocks: vi.fn().mockResolvedValue([
         {
-          ours: { content: 'ours1', ticket: null },
-          theirs: { content: 'theirs1', ticket: null },
+          ours: { content: 'ours1', ticket: null, latestCommitDate: null },
+          theirs: { content: 'theirs1', ticket: null, latestCommitDate: null },
           range: { start: 2, end: 6 },
           surroundingContext: '',
           baseContent: '',
         },
         {
-          ours: { content: 'ours2', ticket: null },
-          theirs: { content: 'theirs2', ticket: null },
+          ours: { content: 'ours2', ticket: null, latestCommitDate: null },
+          theirs: { content: 'theirs2', ticket: null, latestCommitDate: null },
           range: { start: 8, end: 12 },
           surroundingContext: '',
           baseContent: '',
         },
         {
-          ours: { content: 'ours3', ticket: null },
-          theirs: { content: 'theirs3', ticket: null },
+          ours: { content: 'ours3', ticket: null, latestCommitDate: null },
+          theirs: { content: 'theirs3', ticket: null, latestCommitDate: null },
           range: { start: 14, end: 18 },
           surroundingContext: '',
           baseContent: '',

@@ -6,6 +6,7 @@ export interface TicketContext {
 export interface ConflictSide {
   content: string;
   ticket: TicketContext | null;
+  latestCommitDate: string | null;
 }
 
 export interface ConflictBlock {

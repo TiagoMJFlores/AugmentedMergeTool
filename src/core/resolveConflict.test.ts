@@ -18,10 +18,12 @@ function makeBlock(overrides?: Partial<ConflictBlock>): ConflictBlock {
     ours: {
       content: 'const x = 1;',
       ticket: null,
+      latestCommitDate: null,
     },
     theirs: {
       content: 'const x = 2;',
       ticket: null,
+      latestCommitDate: null,
     },
     range: { start: 10, end: 15 },
     surroundingContext: 'function foo() {\n  // ...\n}',
@@ -64,6 +66,7 @@ describe('buildPrompt', () => {
           ticketId: 'NOV-10',
           intentSummary: 'Refactor config loading for clarity',
         },
+        latestCommitDate: null,
       },
       theirs: {
         content: 'const x = 2;',
@@ -71,6 +74,7 @@ describe('buildPrompt', () => {
           ticketId: 'NOV-11',
           intentSummary: 'Add environment variable overrides',
         },
+        latestCommitDate: null,
       },
     });
     const prompt = buildPrompt(block);
@@ -89,6 +93,7 @@ describe('buildPrompt', () => {
           ticketId: 'ENG-5',
           intentSummary: 'Performance improvement',
         },
+        latestCommitDate: null,
       },
     });
     const prompt = buildPrompt(block);
@@ -106,6 +111,7 @@ describe('buildPrompt', () => {
           ticketId: 'ENG-7',
           intentSummary: 'Bug fix for edge case',
         },
+        latestCommitDate: null,
       },
     });
     const prompt = buildPrompt(block);
@@ -253,7 +259,7 @@ describe('resolveConflict', () => {
 
 describe('buildBatchPrompt', () => {
   it('should include all conflicts numbered', () => {
-    const blocks = [makeBlock(), makeBlock({ ours: { content: 'const y = 1;', ticket: null } })];
+    const blocks = [makeBlock(), makeBlock({ ours: { content: 'const y = 1;', ticket: null, latestCommitDate: null } })];
     const prompt = buildBatchPrompt(blocks);
 
     expect(prompt).toContain('Conflict 1 of 2');
@@ -273,7 +279,7 @@ describe('buildBatchPrompt', () => {
   it('should include ticket info when available', () => {
     const blocks = [
       makeBlock({
-        ours: { content: 'a', ticket: { ticketId: 'LIN-1', intentSummary: 'Add feature' } },
+        ours: { content: 'a', ticket: { ticketId: 'LIN-1', intentSummary: 'Add feature' }, latestCommitDate: null },
       }),
     ];
     const prompt = buildBatchPrompt(blocks);
@@ -587,40 +593,40 @@ describe('windowConflictSides', () => {
 
 describe('tryTrivialResolve', () => {
   it('should resolve identical sides without LLM', () => {
-    const result = tryTrivialResolve(makeBlock({ ours: { content: 'same', ticket: null }, theirs: { content: 'same', ticket: null } }));
+    const result = tryTrivialResolve(makeBlock({ ours: { content: 'same', ticket: null, latestCommitDate: null }, theirs: { content: 'same', ticket: null, latestCommitDate: null } }));
     expect(result).not.toBeNull();
     expect(result!.resolution).toBe('same');
     expect(result!.explanation).toContain('identical');
   });
 
   it('should resolve whitespace-only diff without LLM', () => {
-    const result = tryTrivialResolve(makeBlock({ ours: { content: '  code', ticket: null }, theirs: { content: 'code', ticket: null } }));
+    const result = tryTrivialResolve(makeBlock({ ours: { content: '  code', ticket: null, latestCommitDate: null }, theirs: { content: 'code', ticket: null, latestCommitDate: null } }));
     expect(result).not.toBeNull();
     expect(result!.explanation).toContain('Whitespace');
   });
 
   it('should resolve empty ours — keep theirs', () => {
-    const result = tryTrivialResolve(makeBlock({ ours: { content: '', ticket: null }, theirs: { content: 'real code', ticket: null } }));
+    const result = tryTrivialResolve(makeBlock({ ours: { content: '', ticket: null, latestCommitDate: null }, theirs: { content: 'real code', ticket: null, latestCommitDate: null } }));
     expect(result).not.toBeNull();
     expect(result!.resolution).toBe('real code');
     expect(result!.explanation).toContain('kept theirs');
   });
 
   it('should resolve empty theirs — keep ours', () => {
-    const result = tryTrivialResolve(makeBlock({ ours: { content: 'real code', ticket: null }, theirs: { content: '', ticket: null } }));
+    const result = tryTrivialResolve(makeBlock({ ours: { content: 'real code', ticket: null, latestCommitDate: null }, theirs: { content: '', ticket: null, latestCommitDate: null } }));
     expect(result).not.toBeNull();
     expect(result!.resolution).toBe('real code');
     expect(result!.explanation).toContain('kept ours');
   });
 
   it('should resolve both empty', () => {
-    const result = tryTrivialResolve(makeBlock({ ours: { content: '', ticket: null }, theirs: { content: '', ticket: null } }));
+    const result = tryTrivialResolve(makeBlock({ ours: { content: '', ticket: null, latestCommitDate: null }, theirs: { content: '', ticket: null, latestCommitDate: null } }));
     expect(result).not.toBeNull();
     expect(result!.resolution).toBe('');
   });
 
   it('should resolve trailing newline difference only', () => {
-    const result = tryTrivialResolve(makeBlock({ ours: { content: 'code\n', ticket: null }, theirs: { content: 'code', ticket: null } }));
+    const result = tryTrivialResolve(makeBlock({ ours: { content: 'code\n', ticket: null, latestCommitDate: null }, theirs: { content: 'code', ticket: null, latestCommitDate: null } }));
     expect(result).not.toBeNull();
     expect(result!.explanation).toContain('Trailing newline');
   });

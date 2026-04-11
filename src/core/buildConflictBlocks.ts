@@ -15,6 +15,7 @@ interface ParsedConflict {
 interface CommitInfo {
   hash: string;
   message: string;
+  date: string | null;
 }
 
 /**
@@ -203,10 +204,13 @@ export function parseGitLogOutput(output: string): CommitInfo[] {
     const messageLines = restOfOutput.split('\n');
 
     let message = '';
+    let date: string | null = null;
     let seenHeader = false;
     let foundBlank = false;
     for (const line of messageLines) {
       if (!seenHeader) {
+        const dateLine = line.match(/^Date:\s+(.+)/);
+        if (dateLine) date = dateLine[1].trim();
         if (line.trim() !== '') {
           seenHeader = true;
         }
@@ -225,7 +229,7 @@ export function parseGitLogOutput(output: string): CommitInfo[] {
     }
 
     if (hash && message) {
-      commits.push({ hash, message });
+      commits.push({ hash, message, date });
     }
   }
 
@@ -373,10 +377,12 @@ export async function buildConflictBlocks(
       ours: {
         content: conflict.oursContent,
         ticket: oursTicket,
+        latestCommitDate: oursCommits[0]?.date ?? null,
       },
       theirs: {
         content: conflict.theirsContent,
         ticket: theirsTicket,
+        latestCommitDate: theirsCommits[0]?.date ?? null,
       },
       range: conflict.range,
       surroundingContext: conflict.surroundingContext,

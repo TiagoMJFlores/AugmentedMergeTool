@@ -27,6 +27,7 @@ export interface GuiConflictBlock {
     | 'choose-both-left-first'
     | 'choose-both-right-first'
     | null;
+  defaultSide: 'local' | 'remote' | null;
 }
 
 export interface GuiFileEntry {
