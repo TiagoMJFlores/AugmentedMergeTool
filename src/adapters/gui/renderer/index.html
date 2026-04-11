@@ -85,8 +85,23 @@
         </div>
         <div class="settings-body">
           <div class="settings-field">
-            <label for="cfg-anthropic-key">Anthropic API Key</label>
-            <input id="cfg-anthropic-key" type="password" placeholder="sk-ant-..." autocomplete="off" />
+            <label for="cfg-ai-provider">AI Provider</label>
+            <select id="cfg-ai-provider">
+              <option value="anthropic">Anthropic (Claude)</option>
+              <option value="openai">OpenAI (GPT)</option>
+            </select>
+          </div>
+          <div id="cfg-anthropic-fields" class="provider-fields">
+            <div class="settings-field">
+              <label for="cfg-anthropic-key">Anthropic API Key</label>
+              <input id="cfg-anthropic-key" type="password" placeholder="sk-ant-..." autocomplete="off" />
+            </div>
+          </div>
+          <div id="cfg-openai-fields" class="provider-fields hidden">
+            <div class="settings-field">
+              <label for="cfg-openai-key">OpenAI API Key</label>
+              <input id="cfg-openai-key" type="password" placeholder="sk-..." autocomplete="off" />
+            </div>
           </div>
           <div class="settings-field">
             <label for="cfg-provider">Ticket Provider (optional)</label>

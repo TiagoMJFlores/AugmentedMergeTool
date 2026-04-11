@@ -16,7 +16,7 @@ function loadConfig(): MergeAgentConfig {
   try {
     return JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf-8'));
   } catch {
-    return { anthropicApiKey: '', ticketProvider: 'none' };
+    return { aiProvider: 'anthropic', anthropicApiKey: '', ticketProvider: 'none' };
   }
 }
 
@@ -26,7 +26,10 @@ function saveConfigToDisk(config: MergeAgentConfig): void {
 }
 
 function applyConfigToEnv(config: MergeAgentConfig): void {
+  if (config.aiProvider) process.env.AI_PROVIDER = config.aiProvider;
   if (config.anthropicApiKey) process.env.ANTHROPIC_API_KEY = config.anthropicApiKey;
+  if (config.openaiApiKey) process.env.OPENAI_API_KEY = config.openaiApiKey;
+  if (config.openaiModel) process.env.OPENAI_MODEL = config.openaiModel;
   if (config.ticketProvider) process.env.TICKET_PROVIDER = config.ticketProvider;
   if (config.linearApiKey) process.env.LINEAR_API_KEY = config.linearApiKey;
   if (config.jiraApiKey) process.env.JIRA_API_KEY = config.jiraApiKey;
@@ -40,6 +43,7 @@ applyConfigToEnv(loadConfig());
 let activeSession: GuiSession | null = null;
 const sessions = new Map<string, GuiSession>();
 let multiFileMode = false;
+let userResolved = false;
 
 function getActiveSession(): GuiSession {
   if (!activeSession) throw new Error('Session not initialized');
@@ -85,39 +89,66 @@ async function createMainWindow(): Promise<void> {
 
 app.whenReady().then(async () => {
   try {
+    console.log('argv:', process.argv);
     const parsed = parseMergeToolArgs(process.argv.slice(2));
+    console.log('parsed:', JSON.stringify(parsed));
 
-    if (parsed.mode === 'single-file') {
-      activeSession = await GuiSession.create(parsed.args);
+    // Detect repo dir — from explicit dir arg or from file path
+    let repoDir: string;
+    if (parsed.mode === 'multi-file') {
+      repoDir = parsed.repoDir;
     } else {
-      // Multi-file mode — auto-detect from git status
-      const repoDir = parsed.repoDir;
-      const git = simpleGit(repoDir);
-      const status = await git.status();
-      const conflictedFiles = status.conflicted;
-
-      if (conflictedFiles.length === 0) {
-        console.error('No conflicted files found. Run this from a repo with merge conflicts.');
-        app.exit(1);
-        return;
+      // Single-file: find repo root from the file's directory
+      // Walk up if the nearest repo has no conflicts (may be a submodule)
+      const fileDir = path.dirname(parsed.args.merged);
+      let dir = fileDir;
+      repoDir = '';
+      while (dir !== path.dirname(dir)) {
+        try {
+          const g = simpleGit(dir);
+          const top = (await g.revparse(['--show-toplevel'])).trim();
+          const s = await simpleGit(top).status();
+          if (s.conflicted.length > 0) {
+            repoDir = top;
+            break;
+          }
+          // No conflicts here — try parent of this repo root
+          dir = path.dirname(top);
+        } catch {
+          break;
+        }
       }
-
-      multiFileMode = true;
-
-      for (const relPath of conflictedFiles) {
-        const absPath = path.resolve(repoDir, relPath);
-        const session = await GuiSession.create({
-          local: absPath,
-          base: absPath,
-          remote: absPath,
-          merged: absPath,
-          repoDir,
-        });
-        sessions.set(relPath, session);
-      }
-
-      activeSession = sessions.values().next().value!;
+      if (!repoDir) repoDir = fileDir;
     }
+
+    // Always open in multi-file mode with all conflicted files
+    console.log('repoDir:', repoDir);
+    const git = simpleGit(repoDir);
+    const status = await git.status();
+    const conflictedFiles = status.conflicted;
+    console.log('conflicted:', conflictedFiles);
+
+    if (conflictedFiles.length === 0) {
+      console.error('No conflicted files found. Run this from a repo with merge conflicts.');
+      app.exit(1);
+      return;
+    }
+
+    multiFileMode = conflictedFiles.length > 1;
+
+    for (const relPath of conflictedFiles) {
+      const absPath = path.resolve(repoDir, relPath);
+      const session = await GuiSession.create({
+        local: absPath,
+        base: absPath,
+        remote: absPath,
+        merged: absPath,
+        repoDir,
+      });
+      sessions.set(relPath, session);
+    }
+
+    activeSession = sessions.values().next().value!;
 
     await createMainWindow();
   } catch (error) {
@@ -151,6 +182,7 @@ ipcMain.handle('gui:navigate', async (_event, index: number) => {
 ipcMain.handle('gui:finish', async (_event, finalContent?: string) => {
   const session = getActiveSession();
   await session.finish(finalContent);
+  userResolved = true;
 
   if (!multiFileMode) {
     return;
@@ -192,5 +224,8 @@ ipcMain.handle('gui:save-config', async (_event, config: MergeAgentConfig) => {
 });
 
 app.on('window-all-closed', () => {
+  // Exit with code 1 if user closed without resolving — tells git mergetool
+  // that the merge was NOT completed, so it won't auto-stage the file
+  process.exitCode = userResolved ? 0 : 1;
   app.quit();
 });

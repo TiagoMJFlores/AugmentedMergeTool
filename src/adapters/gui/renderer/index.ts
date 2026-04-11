@@ -70,7 +70,10 @@ const settingsBtn = document.getElementById('settings-btn');
 const settingsModal = document.getElementById('settings-modal');
 const settingsClose = document.getElementById('settings-close');
 const settingsSave = document.getElementById('settings-save');
+const cfgAiProvider = document.getElementById('cfg-ai-provider') as HTMLSelectElement | null;
 const cfgAnthropicKey = document.getElementById('cfg-anthropic-key') as HTMLInputElement | null;
+const cfgOpenaiKey = document.getElementById('cfg-openai-key') as HTMLInputElement | null;
+const cfgOpenaiModel = document.getElementById('cfg-openai-model') as HTMLInputElement | null;
 const cfgProvider = document.getElementById('cfg-provider') as HTMLSelectElement | null;
 const cfgLinearKey = document.getElementById('cfg-linear-key') as HTMLInputElement | null;
 const cfgJiraKey = document.getElementById('cfg-jira-key') as HTMLInputElement | null;
@@ -558,6 +561,10 @@ function wireActions(): void {
 
   // --- Settings ---
   function updateProviderFields(): void {
+    const ai = cfgAiProvider?.value || 'anthropic';
+    document.getElementById('cfg-anthropic-fields')?.classList.toggle('hidden', ai !== 'anthropic');
+    document.getElementById('cfg-openai-fields')?.classList.toggle('hidden', ai !== 'openai');
+
     const val = cfgProvider?.value || 'none';
     document.getElementById('cfg-linear-fields')?.classList.toggle('hidden', val !== 'linear');
     document.getElementById('cfg-jira-fields')?.classList.toggle('hidden', val !== 'jira');
@@ -566,7 +573,10 @@ function wireActions(): void {
 
   settingsBtn?.addEventListener('click', async () => {
     const config = await window.mergeGuiApi.getConfig();
+    if (cfgAiProvider) cfgAiProvider.value = config.aiProvider || 'anthropic';
     if (cfgAnthropicKey) cfgAnthropicKey.value = config.anthropicApiKey || '';
+    if (cfgOpenaiKey) cfgOpenaiKey.value = config.openaiApiKey || '';
+    if (cfgOpenaiModel) cfgOpenaiModel.value = config.openaiModel || '';
     if (cfgProvider) cfgProvider.value = config.ticketProvider || 'none';
     if (cfgLinearKey) cfgLinearKey.value = config.linearApiKey || '';
     if (cfgJiraKey) cfgJiraKey.value = config.jiraApiKey || '';
@@ -579,11 +589,15 @@ function wireActions(): void {
 
   settingsClose?.addEventListener('click', () => settingsModal?.classList.add('hidden'));
   settingsModal?.querySelector('.settings-overlay')?.addEventListener('click', () => settingsModal?.classList.add('hidden'));
+  cfgAiProvider?.addEventListener('change', updateProviderFields);
   cfgProvider?.addEventListener('change', updateProviderFields);
 
   settingsSave?.addEventListener('click', async () => {
     await window.mergeGuiApi.saveConfig({
+      aiProvider: (cfgAiProvider?.value as 'anthropic' | 'openai') || 'anthropic',
       anthropicApiKey: cfgAnthropicKey?.value || '',
+      openaiApiKey: cfgOpenaiKey?.value || undefined,
+      openaiModel: cfgOpenaiModel?.value || undefined,
       ticketProvider: (cfgProvider?.value as 'none' | 'linear' | 'jira' | 'github') || 'none',
       linearApiKey: cfgLinearKey?.value || undefined,
       jiraApiKey: cfgJiraKey?.value || undefined,

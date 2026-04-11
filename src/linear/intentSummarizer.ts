@@ -1,18 +1,16 @@
-import 'dotenv/config';
-import Anthropic from '@anthropic-ai/sdk';
+import { generateText } from 'ai';
+import { createAnthropic } from '@ai-sdk/anthropic';
+import { createOpenAI } from '@ai-sdk/openai';
 
-let _anthropic: Anthropic | null = null;
-
-function getAnthropicClient(): Anthropic {
-  if (!_anthropic) {
-    if (!process.env.ANTHROPIC_API_KEY) {
-      throw new Error(
-        'ANTHROPIC_API_KEY is not set. Add it to your .env file.'
-      );
-    }
-    _anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+function getModel() {
+  if (process.env.AI_PROVIDER === 'openai') {
+    if (!process.env.OPENAI_API_KEY) return null;
+    const openai = createOpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    return openai(process.env.OPENAI_MODEL || 'gpt-4o');
   }
-  return _anthropic;
+  if (!process.env.ANTHROPIC_API_KEY) return null;
+  const anthropic = createAnthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  return anthropic('claude-opus-4-5');
 }
 
 export async function summariseIntent(ticket: {
@@ -20,22 +18,20 @@ export async function summariseIntent(ticket: {
   title: string;
   description: string;
 }): Promise<string> {
-  const anthropic = getAnthropicClient();
-  const msg = await anthropic.messages.create({
-    model: 'claude-opus-4-5',
-    max_tokens: 256,
-    messages: [
-      {
-        role: 'user',
-        content: `Summarise the intent of this Linear ticket in 2-3 sentences.
+  const model = getModel();
+  if (!model) return `${ticket.title}`;
+
+  const { text } = await generateText({
+    model,
+    maxOutputTokens: 256,
+    prompt: `Summarise the intent of this Linear ticket in 2-3 sentences.
 Focus on WHAT change was made and WHY — not implementation details.
 Be concise: this summary will be used to resolve a Git merge conflict.
 
 Ticket: ${ticket.id} — ${ticket.title}
 
 ${ticket.description}`,
-      },
-    ],
   });
-  return (msg.content[0] as { type: 'text'; text: string }).text;
+
+  return text;
 }

@@ -33,21 +33,26 @@ export function normalizeProvider(value: string | undefined): ProviderType {
 export function createProvider(config: {
   provider: ProviderType;
 }): TicketProvider {
-  switch (config.provider) {
-    case 'linear':
-      return new LinearProvider(requireEnv('LINEAR_API_KEY'));
-    case 'jira':
-      return new JiraProvider(
-        requireEnv('JIRA_API_KEY'),
-        requireEnv('JIRA_BASE_URL')
-      );
-    case 'github':
-      return new GitHubIssuesProvider(
-        requireEnv('GITHUB_TOKEN'),
-        requireEnv('GITHUB_REPO')
-      );
-    case 'none':
-    default:
-      return new NullProvider();
+  try {
+    switch (config.provider) {
+      case 'linear':
+        return new LinearProvider(requireEnv('LINEAR_API_KEY'));
+      case 'jira':
+        return new JiraProvider(
+          requireEnv('JIRA_API_KEY'),
+          requireEnv('JIRA_BASE_URL')
+        );
+      case 'github':
+        return new GitHubIssuesProvider(
+          requireEnv('GITHUB_TOKEN'),
+          requireEnv('GITHUB_REPO')
+        );
+      case 'none':
+      default:
+        return new NullProvider();
+    }
+  } catch {
+    // Fall back to no provider if keys are missing
+    return new NullProvider();
   }
 }

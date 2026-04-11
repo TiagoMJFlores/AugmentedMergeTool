@@ -72,7 +72,10 @@ export interface ApplyResolutionInput {
 }
 
 export interface MergeAgentConfig {
+  aiProvider: 'anthropic' | 'openai';
   anthropicApiKey: string;
+  openaiApiKey?: string;
+  openaiModel?: string;
   ticketProvider: 'none' | 'linear' | 'jira' | 'github';
   linearApiKey?: string;
   jiraApiKey?: string;
