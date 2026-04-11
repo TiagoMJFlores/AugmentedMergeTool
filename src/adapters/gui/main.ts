@@ -1,10 +1,41 @@
 import 'dotenv/config';
+import * as fs from 'fs';
+import * as os from 'os';
 import * as path from 'path';
 import { app, BrowserWindow, ipcMain } from 'electron';
 import simpleGit from 'simple-git';
 import { GuiSession } from './session.js';
-import type { ApplyResolutionInput, GuiSessionState, GuiMultiFileState, ResolveAndStoreInput } from './contracts.js';
+import type { ApplyResolutionInput, GuiSessionState, GuiMultiFileState, MergeAgentConfig, ResolveAndStoreInput } from './contracts.js';
 import { parseMergeToolArgs, type ParsedArgs } from './args.js';
+
+// --- Config (loads before dotenv so it takes priority) ---
+const CONFIG_DIR = path.join(os.homedir(), '.mergeagent');
+const CONFIG_PATH = path.join(CONFIG_DIR, 'config.json');
+
+function loadConfig(): MergeAgentConfig {
+  try {
+    return JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf-8'));
+  } catch {
+    return { anthropicApiKey: '', ticketProvider: 'none' };
+  }
+}
+
+function saveConfigToDisk(config: MergeAgentConfig): void {
+  fs.mkdirSync(CONFIG_DIR, { recursive: true });
+  fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2), 'utf-8');
+}
+
+function applyConfigToEnv(config: MergeAgentConfig): void {
+  if (config.anthropicApiKey) process.env.ANTHROPIC_API_KEY = config.anthropicApiKey;
+  if (config.ticketProvider) process.env.TICKET_PROVIDER = config.ticketProvider;
+  if (config.linearApiKey) process.env.LINEAR_API_KEY = config.linearApiKey;
+  if (config.jiraApiKey) process.env.JIRA_API_KEY = config.jiraApiKey;
+  if (config.jiraBaseUrl) process.env.JIRA_BASE_URL = config.jiraBaseUrl;
+  if (config.githubToken) process.env.GITHUB_TOKEN = config.githubToken;
+  if (config.githubRepo) process.env.GITHUB_REPO = config.githubRepo;
+}
+
+applyConfigToEnv(loadConfig());
 
 let activeSession: GuiSession | null = null;
 const sessions = new Map<string, GuiSession>();
@@ -151,6 +182,13 @@ ipcMain.handle('gui:finish-all', async () => {
     }
   }
   setTimeout(() => app.quit(), 200);
+});
+
+ipcMain.handle('gui:get-config', async () => loadConfig());
+
+ipcMain.handle('gui:save-config', async (_event, config: MergeAgentConfig) => {
+  saveConfigToDisk(config);
+  applyConfigToEnv(config);
 });
 
 app.on('window-all-closed', () => {

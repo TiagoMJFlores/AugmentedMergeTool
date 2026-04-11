@@ -10,6 +10,8 @@ const api: RendererApi = {
   finish: (finalContent) => ipcRenderer.invoke('gui:finish', finalContent),
   switchFile: (filePath) => ipcRenderer.invoke('gui:switch-file', filePath),
   finishAll: () => ipcRenderer.invoke('gui:finish-all'),
+  getConfig: () => ipcRenderer.invoke('gui:get-config'),
+  saveConfig: (config) => ipcRenderer.invoke('gui:save-config', config),
 };
 
 contextBridge.exposeInMainWorld('mergeGuiApi', api);
