@@ -4,6 +4,9 @@
 
 Resolve merge conflicts with intent, not guesswork.
 
+<img width="1380" height="801" alt="image" src="https://github.com/user-attachments/assets/ab7a63ef-1908-47c7-ae43-1c857e9922b5" />
+
+
 ------------------------------------------------------------------------
 
 ## How it works
