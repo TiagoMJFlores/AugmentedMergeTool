@@ -1,5 +1,5 @@
 {
-  "name": "augmented-merge-tool",
+  "name": "AugmentedMergeTool",
   "version": "1.0.0",
   "description": "Essentialist AI merge conflict resolver — detects conflicts, extracts ticket intent from commit messages, resolves with Claude.",
   "main": "dist/index.js",

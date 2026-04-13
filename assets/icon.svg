@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="96" fill="#1e293b"/>
+  <!-- Left branch -->
+  <circle cx="160" cy="128" r="32" fill="#3b82f6"/>
+  <line x1="160" y1="160" x2="160" y2="320" stroke="#3b82f6" stroke-width="24" stroke-linecap="round"/>
+  <line x1="160" y1="320" x2="256" y2="384" stroke="#3b82f6" stroke-width="24" stroke-linecap="round"/>
+  <!-- Right branch -->
+  <circle cx="352" cy="128" r="32" fill="#ef4444"/>
+  <line x1="352" y1="160" x2="352" y2="320" stroke="#ef4444" stroke-width="24" stroke-linecap="round"/>
+  <line x1="352" y1="320" x2="256" y2="384" stroke="#ef4444" stroke-width="24" stroke-linecap="round"/>
+  <!-- Merge point -->
+  <circle cx="256" cy="384" r="36" fill="#22c55e"/>
+  <!-- AI sparkle -->
+  <text x="256" y="404" text-anchor="middle" font-size="36" font-weight="bold" fill="white">AI</text>
+</svg>

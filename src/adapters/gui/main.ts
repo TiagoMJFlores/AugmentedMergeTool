@@ -70,8 +70,10 @@ function injectMultiFile(state: GuiSessionState): GuiSessionState {
 
 async function createMainWindow(): Promise<void> {
   const mainWindow = new BrowserWindow({
+    title: 'AugmentedMergeTool',
     width: 1400,
     height: 900,
+    icon: path.join(__dirname, '..', '..', '..', 'assets', 'icon.svg'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -85,7 +87,7 @@ async function createMainWindow(): Promise<void> {
 
   const menu = Menu.buildFromTemplate([
     {
-      label: 'MergeAgent',
+      label: 'AugmentedMergeTool',
       submenu: [
         { role: 'about' },
         { type: 'separator' },
