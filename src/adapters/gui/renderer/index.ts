@@ -607,6 +607,13 @@ function wireActions(): void {
     });
     settingsModal?.classList.add('hidden');
   });
+
+  // --- Keyboard shortcuts from menu ---
+  window.mergeGuiApi.onShortcut((action) => {
+    if (action === 'previous') prevButton?.click();
+    else if (action === 'next') nextButton?.click();
+    else if (action === 'resolve') finishButton?.click();
+  });
 }
 
 async function init(): Promise<void> {

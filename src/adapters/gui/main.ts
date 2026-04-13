@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { app, BrowserWindow, ipcMain } from 'electron';
+import { app, BrowserWindow, ipcMain, Menu } from 'electron';
 import simpleGit from 'simple-git';
 import { GuiSession } from './session.js';
 import type { ApplyResolutionInput, GuiSessionState, GuiMultiFileState, MergeAgentConfig, ResolveAndStoreInput } from './contracts.js';
@@ -82,6 +82,51 @@ async function createMainWindow(): Promise<void> {
   if (process.env.MERGEAGENT_GUI_DEBUG === '1') {
     mainWindow.webContents.openDevTools({ mode: 'bottom' });
   }
+
+  const menu = Menu.buildFromTemplate([
+    {
+      label: 'MergeAgent',
+      submenu: [
+        { role: 'about' },
+        { type: 'separator' },
+        { role: 'quit' },
+      ],
+    },
+    {
+      label: 'Navigate',
+      submenu: [
+        {
+          label: 'Previous Conflict',
+          accelerator: 'CmdOrCtrl+Up',
+          click: () => mainWindow.webContents.send('shortcut', 'previous'),
+        },
+        {
+          label: 'Next Conflict',
+          accelerator: 'CmdOrCtrl+Down',
+          click: () => mainWindow.webContents.send('shortcut', 'next'),
+        },
+        { type: 'separator' },
+        {
+          label: 'Resolve File',
+          accelerator: 'CmdOrCtrl+Enter',
+          click: () => mainWindow.webContents.send('shortcut', 'resolve'),
+        },
+      ],
+    },
+    {
+      label: 'Edit',
+      submenu: [
+        { role: 'undo' },
+        { role: 'redo' },
+        { type: 'separator' },
+        { role: 'cut' },
+        { role: 'copy' },
+        { role: 'paste' },
+        { role: 'selectAll' },
+      ],
+    },
+  ]);
+  Menu.setApplicationMenu(menu);
 
   await mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'));
 }
