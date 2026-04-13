@@ -2,7 +2,7 @@
   "name": "AugmentedMergeTool",
   "version": "1.0.0",
   "description": "Essentialist AI merge conflict resolver — detects conflicts, extracts ticket intent from commit messages, resolves with Claude.",
-  "main": "dist/index.js",
+  "main": "dist/adapters/gui/main.js",
   "bin": {
     "mergeagent": "bin/mergeagent"
   },
@@ -13,7 +13,26 @@
     "test:watch": "vitest",
     "copy:gui-assets": "node -e \"const fs=require('fs');fs.mkdirSync('dist/adapters/gui/renderer',{recursive:true});fs.copyFileSync('src/adapters/gui/renderer/index.html','dist/adapters/gui/renderer/index.html');fs.copyFileSync('src/adapters/gui/renderer/styles.css','dist/adapters/gui/renderer/styles.css');fs.copyFileSync('src/adapters/gui/renderer/cjs-shim.js','dist/adapters/gui/renderer/cjs-shim.js');\"",
     "start:gui": "npm run build && npx electron dist/adapters/gui/main.js",
-    "setup": "npm run build && node scripts/setup.js"
+    "setup": "npm run build && node scripts/setup.js",
+    "pack": "npm run build && electron-builder --dir",
+    "dist": "npm run build && electron-builder"
+  },
+  "build": {
+    "appId": "com.augmented.mergetool",
+    "productName": "AugmentedMergeTool",
+    "mac": {
+      "category": "public.app-category.developer-tools",
+      "icon": "assets/icon.png",
+      "identity": null
+    },
+    "files": [
+      "dist/**/*",
+      "assets/**/*",
+      "node_modules/**/*"
+    ],
+    "directories": {
+      "output": "release"
+    }
   },
   "repository": {
     "type": "git",
@@ -34,11 +53,13 @@
     "ai": "^6.0.158",
     "dotenv": "^17.3.1",
     "openai": "^6.34.0",
-    "simple-git": "^3.33.0"
+    "simple-git": "^3.33.0",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@types/node": "^25.5.0",
     "electron": "^35.0.0",
+    "electron-builder": "^26.8.1",
     "typescript": "^6.0.2",
     "vitest": "^4.1.2"
   }

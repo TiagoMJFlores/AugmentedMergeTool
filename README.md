@@ -25,10 +25,11 @@ For each conflict, AugmentedMergeTool:
 git clone https://github.com/TiagoMJFlores/AugmentedMergeTool.git
 cd AugmentedMergeTool
 npm install
-npm run setup
+npm run pack
+sudo npm run setup
 ```
 
-`npm run setup` builds the project and registers it as your default git merge tool. After setup, `mergeagent` is available globally.
+`npm run pack` builds the packaged app with the correct name and icon. `npm run setup` registers it as your default git merge tool. After setup, `mergeagent` is available globally.
 
 ------------------------------------------------------------------------
 
