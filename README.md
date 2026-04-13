@@ -52,17 +52,17 @@ mergeagent "/path/to/conflicted/file.swift"
 
 ### From SourceTree
 
-1. Go to **Settings > Diff > Merge Tool > Custom**
-2. **Merge Command:** `mergeagent`
-3. **Arguments:** `$MERGED`
-4. Click a conflicted file > **Launch External Merge Tool**
+1. Go to Settings > Diff > Merge Tool > Custom
+2. Merge Command: `mergeagent`
+3. Arguments: `$MERGED`
+4. Click a conflicted file > Launch External Merge Tool
 
 ### From GitKraken
 
-1. Go to **Preferences > General > Merge Tool > Custom**
-2. **Merge Command:** `mergeagent`
-3. **Arguments:** `$MERGED`
-4. Right-click a conflicted file > **Launch Merge Tool**
+1. Go to Preferences > General > Merge Tool > Custom
+2. Merge Command: `mergeagent`
+3. Arguments: `$MERGED`
+4. Right-click a conflicted file > Launch Merge Tool
 
 ### From any git client
 
@@ -79,11 +79,11 @@ git mergetool
 
 ## Configuration
 
-Click the **gear icon** in the top-right corner of the app to configure:
+Click the gear icon in the top-right corner of the app to configure:
 
-- **AI Provider** — Anthropic (Claude) or OpenAI (GPT)
-- **API Key** — for the selected provider
-- **Ticket Provider** (optional) — Linear, Jira, or GitHub for ticket context
+- AI Provider — Anthropic (Claude) or OpenAI (GPT)
+- API Key — for the selected provider
+- Ticket Provider (optional) — Linear, Jira, or GitHub for ticket context
 
 Config is saved to `~/.mergeagent/config.json` and persists between runs.
 
