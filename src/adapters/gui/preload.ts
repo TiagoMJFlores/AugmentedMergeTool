@@ -12,6 +12,7 @@ const api: RendererApi = {
   finishAll: () => ipcRenderer.invoke('gui:finish-all'),
   getConfig: () => ipcRenderer.invoke('gui:get-config'),
   saveConfig: (config) => ipcRenderer.invoke('gui:save-config', config),
+  onShortcut: (callback: (action: string) => void) => ipcRenderer.on('shortcut', (_event, action) => callback(action)),
 };
 
 contextBridge.exposeInMainWorld('mergeGuiApi', api);

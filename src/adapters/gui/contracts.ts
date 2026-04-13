@@ -95,4 +95,5 @@ export interface RendererApi {
   finishAll: () => Promise<void>;
   getConfig: () => Promise<MergeAgentConfig>;
   saveConfig: (config: MergeAgentConfig) => Promise<void>;
+  onShortcut: (callback: (action: string) => void) => void;
 }
