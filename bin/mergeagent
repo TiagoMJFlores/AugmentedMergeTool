@@ -8,4 +8,10 @@ while [ -L "$SOURCE" ]; do
 done
 DIR="$(cd -P "$(dirname "$SOURCE")/.." && pwd)"
 
-npx electron "$DIR/dist/adapters/gui/main.js" "$@"
+# Use packaged app if available, otherwise npx electron
+APP="$DIR/release/mac-arm64/AugmentedMergeTool.app/Contents/MacOS/AugmentedMergeTool"
+if [ -x "$APP" ]; then
+  "$APP" "$@"
+else
+  npx electron "$DIR/dist/adapters/gui/main.js" "$@"
+fi
